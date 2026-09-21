@@ -1,0 +1,58 @@
+{
+  "name": "anchor-local",
+  "version": "1.3.0",
+  "description": "Personal encrypted vault and local reminders",
+  "author": "Personal",
+  "private": true,
+  "main": "dist-electron/main.js",
+  "scripts": {
+    "build": "node scripts/build.cjs",
+    "start": "npm run build && electron .",
+    "test": "node scripts/test.cjs",
+    "package": "npm run build && electron-builder --win nsis --x64",
+    "package:folder": "npm run build && node scripts/package-folder.cjs"
+  },
+  "dependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "sql.js": "^1.13.0",
+    "lucide-react": "^0.468.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@types/sql.js": "^1.4.9",
+    "typescript": "^5.9.0",
+    "electron": "44.3.0",
+    "electron-builder": "^26.0.12",
+    "esbuild": "0.28.2"
+  },
+  "build": {
+    "appId": "local.anchor.desktop",
+    "productName": "Anchor",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "assets/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icon.ico",
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true
+    }
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  }
+}

@@ -1,0 +1,7 @@
+node_modules/
+dist/
+dist-electron/
+release/
+*.db
+*.anchor
+.test-data/

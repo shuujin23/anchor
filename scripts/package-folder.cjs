@@ -1,0 +1,13 @@
+const fs=require('node:fs'),path=require('node:path');
+const root=path.resolve(__dirname,'..'),release=path.join(root,'release','Anchor');
+const {version}=require('../package.json');
+fs.mkdirSync(release,{recursive:true});
+fs.cpSync(path.join(root,'node_modules','electron','dist'),release,{recursive:true,filter:source=>!['electron.exe','default_app.asar','version'].includes(path.basename(source))});
+fs.copyFileSync(path.join(root,'node_modules','electron','dist','electron.exe'),path.join(release,'Anchor.exe'));
+const appDir=path.join(release,'resources','app');fs.mkdirSync(appDir,{recursive:true});
+for(const dir of ['dist','dist-electron','assets'])fs.cpSync(path.join(root,dir),path.join(appDir,dir),{recursive:true});
+fs.mkdirSync(path.join(appDir,'node_modules'),{recursive:true});
+fs.cpSync(path.join(root,'node_modules','sql.js'),path.join(appDir,'node_modules','sql.js'),{recursive:true});
+fs.writeFileSync(path.join(appDir,'package.json'),JSON.stringify({name:'anchor-local',productName:'Anchor',version,main:'dist-electron/main.js'}));
+fs.writeFileSync(path.join(release,'anchor.install'),'anchor-local-'+version);
+console.log('Windows app folder ready:',release);
