@@ -1,0 +1,30 @@
+name: Build Windows release
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - name: Build installer and update metadata
+        run: npx electron-builder --win nsis --x64 --publish never
+      - name: Read version
+        id: version
+        shell: pwsh
+        run: '"version=$((Get-Content package.json | ConvertFrom-Json).version)" >> $env:GITHUB_OUTPUT'
+      - name: Create draft release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          gh release create "v$env:VERSION" "release/Anchor-Setup-$env:VERSION.exe" "release/Anchor-Setup-$env:VERSION.exe.blockmap" "release/latest.yml" --draft --title "Anchor $env:VERSION" --generate-notes --target "${{ github.sha }}"

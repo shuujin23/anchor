@@ -1,6 +1,6 @@
 {
   "name": "anchor-local",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "Personal encrypted vault and local reminders",
   "author": "Personal",
   "private": true,
@@ -9,24 +9,25 @@
     "build": "node scripts/build.cjs",
     "start": "npm run build && electron .",
     "test": "node scripts/test.cjs",
-    "package": "npm run build && electron-builder --win nsis --x64",
+    "package": "npm run build && electron-builder --win nsis --x64 --publish never",
     "package:folder": "npm run build && node scripts/package-folder.cjs"
   },
   "dependencies": {
+    "electron-updater": "^6.8.9",
+    "lucide-react": "^0.468.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "sql.js": "^1.13.0",
-    "lucide-react": "^0.468.0"
+    "sql.js": "^1.13.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@types/sql.js": "^1.4.9",
-    "typescript": "^5.9.0",
     "electron": "44.3.0",
     "electron-builder": "^26.0.12",
-    "esbuild": "0.28.2"
+    "esbuild": "0.28.2",
+    "typescript": "^5.9.0"
   },
   "build": {
     "appId": "local.anchor.desktop",
@@ -48,11 +49,24 @@
     "nsis": {
       "oneClick": false,
       "perMachine": false,
-      "allowToChangeInstallationDirectory": true,
+      "allowToChangeInstallationDirectory": false,
       "createDesktopShortcut": true
-    }
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "shuujin23",
+        "repo": "anchor",
+        "releaseType": "release"
+      }
+    ],
+    "artifactName": "Anchor-Setup-${version}.${ext}"
   },
   "engines": {
     "node": ">=22.12.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/shuujin23/anchor.git"
   }
 }

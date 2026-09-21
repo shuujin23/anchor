@@ -1,4 +1,5 @@
 const fs=require('node:fs'),path=require('node:path');
+if(require('../package.json').dependencies['electron-updater'])throw new Error('Anchor 1.4+ memakai electron-builder. Jalankan npm run package agar dependensi updater dan metadata ikut dikemas.');
 const root=path.resolve(__dirname,'..'),release=path.join(root,'release','Anchor');
 const {version}=require('../package.json');
 fs.mkdirSync(release,{recursive:true});

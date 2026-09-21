@@ -6,6 +6,7 @@ import { randomInt } from 'node:crypto';
 import { Store } from './store';
 import { deliverDue } from './scheduler';
 import { AutomaticBackup } from './automatic-backup';
+import { createUpdates } from './updates';
 
 app.setName('Anchor');
 app.setPath('userData', process.env.ANCHOR_DATA_DIR ? path.resolve(process.env.ANCHOR_DATA_DIR) : path.join(app.getPath('appData'),'Anchor'));
@@ -14,13 +15,14 @@ const single = app.requestSingleInstanceLock();
 if (!single) app.quit();
 let win: BrowserWindow | null = null, tray: Tray, store: Store, quitting = false, ticking = false;
 let automaticBackup: AutomaticBackup;
+let updates: ReturnType<typeof createUpdates>;
 let clipboardTimer: NodeJS.Timeout | undefined, ownedClipboard: string | null = null;
 let lastUnlock = 0;
 const indexUrl = pathToFileURL(path.join(__dirname,'../dist/index.html')).href;
 const show = () => { win?.show(); win?.focus(); };
 const clearClipboard = async () => { const expected = ownedClipboard; ownedClipboard = null; if (expected !== null && await clipboard.readText() === expected) clipboard.clear(); };
 function lock() { store.lock(); void clearClipboard().catch(()=>{}); win?.webContents.send('vault-locked'); }
-function settings() { return { automaticBackup:automaticBackup.settings(),autoStart:app.isPackaged ? app.getLoginItemSettings({args:['--hidden']}).openAtLogin : false, packaged:app.isPackaged, autoLockMinutes:Number(store.get('autoLockMinutes') || 5), hasWebhook:!!store.get('webhook'), dataPath:store.file, lastDeliveryError:store.get('lastDeliveryError') || '', timezone:Intl.DateTimeFormat().resolvedOptions().timeZone }; }
+function settings() { return { updates:updates.state(),automaticBackup:automaticBackup.settings(),autoStart:app.isPackaged ? app.getLoginItemSettings({args:['--hidden']}).openAtLogin : false, packaged:app.isPackaged, autoLockMinutes:Number(store.get('autoLockMinutes') || 5), hasWebhook:!!store.get('webhook'), dataPath:store.file, lastDeliveryError:store.get('lastDeliveryError') || '', timezone:Intl.DateTimeFormat().resolvedOptions().timeZone }; }
 function webhook() {
   const value = store.get('webhook'); if (!value) throw new Error('Discord webhook belum diatur.');
   try { return safeStorage.decryptString(Buffer.from(value,'base64')); } catch { throw new Error('Webhook tidak bisa dibuka di akun Windows ini. Atur ulang webhook.'); }
@@ -53,6 +55,9 @@ async function tick() {
 }
 function register() {
   const handlers: Record<string,(arg: any) => any> = {
+    checkUpdates:() => updates.check(true),
+    downloadUpdate:() => updates.download(),
+    installUpdate:() => updates.install(),
     status:() => ({initialized:!!store.get('salt'),unlocked:!!store.key}),
     setup:(arg) => store.setup(arg.password),
     unlock:(arg) => { if (Date.now() - lastUnlock < 1500) throw new Error('Tunggu sebentar sebelum mencoba lagi.'); lastUnlock = Date.now(); store.unlock(arg.password); },
@@ -141,6 +146,7 @@ if (single) app.whenReady().then(async () => {
   });
   session.defaultSession.setPermissionRequestHandler((_w,_p,callback) => callback(false));
   session.defaultSession.setPermissionCheckHandler(() => false);
+  updates=createUpdates(()=>{quitting=true;lock();});
   register();
   win = new BrowserWindow({width:1280,height:850,minWidth:960,minHeight:700,title:'Anchor',backgroundColor:'#f6f7f9',icon:path.join(__dirname,'../assets/icon.png'),show:false,webPreferences:{preload:path.join(__dirname,'preload.js'),nodeIntegration:false,contextIsolation:true,sandbox:true,devTools:!app.isPackaged}});
   win.webContents.setWindowOpenHandler(() => ({action:'deny'}));
@@ -152,6 +158,7 @@ if (single) app.whenReady().then(async () => {
   tray.setToolTip('Anchor · Vault & Reminders');
   tray.setContextMenu(Menu.buildFromTemplate([{label:'Buka Anchor',click:show},{label:'Kunci vault',click:lock},{type:'separator'},{label:'Keluar (hentikan reminder)',click:() => app.quit()}]));
   tray.on('double-click',show);
+  if(app.isPackaged){setTimeout(()=>void updates.check(),15000);setInterval(()=>void updates.check(),6*60*60*1000);}
   powerMonitor.on('lock-screen',lock); powerMonitor.on('suspend',lock); powerMonitor.on('resume',() => {void tick();void automaticBackup.runDue().catch(()=>{});});
   setInterval(() => void tick(),1000); void tick();
   setInterval(() => void automaticBackup.runDue().catch(()=>{}),60000);

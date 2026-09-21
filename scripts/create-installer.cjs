@@ -1,4 +1,5 @@
 const fs=require('node:fs'),path=require('node:path');
+if(require('../package.json').dependencies['electron-updater'])throw new Error('Installer manual tidak mendukung updater. Jalankan npm run package atau workflow Build Windows release.');
 const root=path.resolve(__dirname,'..'),appFolder=path.join(root,'release','Anchor');
 const {version}=require('../package.json');
 const files=[],dirs=[];

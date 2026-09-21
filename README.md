@@ -117,3 +117,7 @@ Pada form reminder, pilih perulangan Custom, isi Setiap (1–365), lalu pilih de
 
 Scheduler memeriksa setiap satu detik. Pengiriman mengikuti ketersediaan Windows/Discord dan bukan timer real-time dengan jaminan presisi. Aplikasi harus berjalan dan PC aktif. Jadwal interval singkat yang terlewat dihitung langsung dari waktu awal, tanpa mengirim seluruh backlog. Tanggal mulai dan tampilan jadwal kini mendukung detik.
 Verifikasi 1.3.0: build produksi/TypeScript berhasil dan pengujian terakhir lulus 36/36. Pengiriman Windows/Discord live untuk interval singkat belum diuji di lingkungan pengerjaan.
+
+## Auto-update — versi 1.4.0
+
+Popup update GitHub Releases dan Pengaturan → Cek update sudah ditambahkan. Build versi ini wajib melalui electron-builder, menggantikan cara installer manual pada panduan lama. Lihat RELEASING.md untuk alur build, draft release, publikasi, dan batas verifikasi.
