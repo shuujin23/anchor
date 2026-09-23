@@ -154,7 +154,7 @@ test('backup preserves ongoing mode and next reminder, and accepts old v1 backup
   const s=await ongoing();s.setup('master password for source');
   await deliverDue(s,()=>{},async()=>{},new Date(2026,8,14,9));
   const backup=s.exportBackup('backup password example');
-  assert.equal(JSON.parse(backup).version,2);
+  assert.equal(JSON.parse(backup).version,4);
   const target=await store();target.setup('different master password');target.importBackup(backup,'backup password example');
   assert.deepEqual(target.reminders(),s.reminders());
   target.action(target.reminders()[0].id,'complete');assert.equal(target.reminders()[0].nextNotify,null);

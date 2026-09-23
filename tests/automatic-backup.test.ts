@@ -34,9 +34,9 @@ test('configuration rejects invalid credentials and schedules without enabling',
   assert.equal(f.service.settings().enabled,false);assert.equal(await f.service.runDue(),null);
 });
 test('locked vault backup restores credentials with original master into a different vault',async()=>{
-  const f=await fixture();await f.service.configure(f.config);f.s.lock();const activity=f.s.lastActivity;
+  const f=await fixture();const runbookId=f.s.saveRunbook({title:'Recover app',category:'Recovery',description:'',credentialIds:[],steps:[{id:'one',title:'Start service',type:'command',content:'docker compose up -d'}]});const sessionId=f.s.startRunbook(runbookId);await f.service.configure(f.config);f.s.lock();const activity=f.s.lastActivity;
   const result=await f.service.runDue();assert.equal(result?.ok,true);assert.equal(f.s.key,null);assert.equal(f.s.lastActivity,activity);
-  const content=await fs.readFile(result!.file!,'utf8');assert.equal(JSON.parse(content).version,3);
+  const content=await fs.readFile(result!.file!,'utf8');assert.equal(JSON.parse(content).version,4);
   assert.equal(content.includes('secret-value-928371'),false);assert.equal(content.includes(password),false);
   assert.equal(f.s.get('automaticBackup.config')!.includes(password),false);
   const config=JSON.parse(f.s.get('automaticBackup.config')!);const secret=JSON.parse(f.protection.unseal(config.protectedKey));
@@ -45,6 +45,7 @@ test('locked vault backup restores credentials with original master into a diffe
   const target=new Store(path.join(f.dir,'restored.db'));await target.open();target.setup('different-master-password');
   assert.throws(()=>target.importBackup(content,'wrong-password'));assert.equal(target.credentials().length,0);
   target.importBackup(content,password);assert.equal(target.credential(target.credentials()[0].id).password,'secret-value-928371');
+  assert.equal(target.runbook(runbookId).steps[0].content,'docker compose up -d');assert.equal(target.runbookSession(sessionId).status,'running');
   target.importBackup(content,password);assert.equal(target.credentials().length,1);
   assert.equal(target.get('automaticBackup.config'),null);
 });

@@ -79,6 +79,15 @@ function register() {
     reminderAction:(arg) => store.action(arg.id,arg.action,arg.minutes),
     deleteReminder:(arg) => store.remove('reminders',arg.id),
     history:() => store.history(),
+    runbooks:() => store.runbooks(),
+    runbook:(arg) => store.runbook(arg.id),
+    saveRunbook:(arg) => store.saveRunbook(arg),
+    deleteRunbook:(arg) => store.removeRunbook(arg.id),
+    runbookSessions:(arg) => store.runbookSessions(arg?.runbookId),
+    runbookSession:(arg) => store.runbookSession(arg.id),
+    startRunbook:(arg) => store.startRunbook(arg.id),
+    runbookSessionAction:(arg) => store.runbookSessionAction(arg),
+    copyText:async(arg) => { if(!arg||typeof arg.text!=='string'||!arg.text||arg.text.length>20000)throw new Error('Teks tidak valid.');clearTimeout(clipboardTimer);await clearClipboard();ownedClipboard=arg.text;await clipboard.writeText(arg.text);clipboardTimer=setTimeout(()=>void clearClipboard().catch(()=>{}),30000); },
     settings:() => settings(),
     pickBackupFolder:async () => {
       store.requireKey();

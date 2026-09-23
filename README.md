@@ -64,7 +64,7 @@ Gunakan **Pengaturan → Ekspor backup** dengan password backup minimal 12 karak
 
 **Pulihkan backup** menggabungkan item berdasarkan ID. Item yang sudah ada tetap dipertahankan, sehingga backup lama tidak membatalkan pembayaran yang sudah dicatat. Webhook Discord dan preferensi perangkat tidak ikut dibackup; atur ulang di perangkat baru. Menyalin database saja memerlukan master password asli dan tidak membuat webhook portabel.
 
-Versi 1.1.0 tetap membaca database dan backup versi lama. Backup baru memakai format v2 agar mode tanpa deadline tidak disalahartikan oleh aplikasi 1.0.0; pulihkan backup v2 menggunakan Anchor 1.1.0 atau lebih baru.
+Versi terbaru tetap membaca database dan backup versi lama. Backup v2 memperkenalkan mode tanpa deadline; backup v4 menambahkan runbook terenkripsi dan harus dipulihkan memakai Anchor 1.5.0 atau lebih baru.
 
 ## Pengembangan
 
@@ -103,7 +103,7 @@ Buka Pengaturan → Backup otomatis ke storage eksternal. Aktifkan, pilih folder
 
 Backup berjalan saat vault terkunci selama Anchor berjalan dan PC aktif. Jadwal terlewat dijalankan sekali saat aplikasi aktif kembali. Storage yang terputus dicoba ulang setelah 15 menit. Tanggal 29–31 disesuaikan ke akhir bulan pendek. Setiap file memiliki nama unik; backup lama tidak dihapus otomatis.
 
-File otomatis memakai format v3 dan dipulihkan dengan master password vault asal saat file dibuat, menggunakan Anchor 1.2.0 atau lebih baru. Master password dan kunci pembuka vault tidak disimpan untuk scheduler; hanya kunci enkripsi backup terpisah yang dilindungi safeStorage sistem operasi. Backup tidak membuka credential saat vault terkunci. Backup manual tetap v2 dengan password pilihan pengguna; impor v1/v2 tetap didukung. Preferensi perangkat dan webhook tidak ikut backup.
+File otomatis baru memakai format v4 dan dipulihkan dengan master password vault asal saat file dibuat, menggunakan Anchor 1.5.0 atau lebih baru. Master password dan kunci pembuka vault tidak disimpan untuk scheduler; hanya kunci enkripsi backup terpisah yang dilindungi safeStorage sistem operasi. Backup tidak membuka credential atau runbook saat vault terkunci. Backup manual juga memakai v4 dengan password pilihan pengguna; impor v1–v3 tetap didukung. Preferensi perangkat dan webhook tidak ikut backup.
 
 Status berhasil menunjukkan file sudah ditulis dan dibaca ulang di folder tujuan. Upload cloud ditangani Google Drive for desktop dan harus diperiksa di aplikasi tersebut. Tidak ada akun Google yang dihubungkan atau backup cloud yang diaktifkan otomatis oleh installer.
 
@@ -121,3 +121,13 @@ Verifikasi 1.3.0: build produksi/TypeScript berhasil dan pengujian terakhir lulu
 ## Auto-update — versi 1.4.0
 
 Popup update GitHub Releases dan Pengaturan → Cek update sudah ditambahkan. Build versi ini wajib melalui electron-builder, menggantikan cara installer manual pada panduan lama. Lihat RELEASING.md untuk alur build, draft release, publikasi, dan batas verifikasi.
+
+## Runbook — versi 1.5.0
+
+Halaman Runbooks menyimpan prosedur operasional sebagai langkah berurutan. Setiap langkah dapat berupa instruksi, command, atau URL dan dapat ditautkan ke satu atau beberapa credential. Command dan URL memiliki tombol salin; clipboard dibersihkan otomatis setelah 30 detik.
+
+Memulai eksekusi membuat snapshot checklist baru. Progres sesi tetap tersimpan setelah Anchor ditutup, dengan status per langkah: selesai, dilewati, atau gagal beserta catatan hasil. Template dapat diedit tanpa mengubah sesi aktif maupun riwayat. Menghapus template juga tidak menghapus riwayat eksekusinya.
+
+Isi runbook, command, URL, catatan sesi, dan riwayatnya dienkripsi dengan master password vault. Data hanya dapat dibuka saat vault terbuka. Backup manual dan otomatis format v4 menyertakan runbook serta sesi; backup v1–v3 tetap dapat dipulihkan. Anchor 1.4 dan versi lebih lama tidak dapat membaca backup v4.
+
+Verifikasi 1.5.0: build TypeScript/produksi berhasil, 40/40 tes lulus, dan alur create → start → complete → history diperiksa melalui preview UI lokal. Eksekusi command tetap manual; Anchor hanya menampilkan dan menyalinnya.
