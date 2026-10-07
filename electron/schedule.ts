@@ -2,6 +2,7 @@ export type Reminder = {
   // Missing mode means a legacy deadline reminder. In ongoing mode `due` is the
   // first reminder time, not a deadline; nextNotify tracks delivery independently.
   mode?: 'deadline' | 'ongoing';
+  estimatedHours?: number | null; actualHours?: number | null; completedAt?: string | null;
   id: string; title: string; kind: 'task' | 'bill'; notes: string; amount: number; currency: string;
   anchor: string; due: string; recurrence: 'once' | 'daily' | 'weekly' | 'monthly' | 'yearly' | 'custom';
   every: number; unit: 'seconds' | 'minutes' | 'hours' | 'days' | 'weeks' | 'months' | 'years'; leadMinutes: number; repeatMinutes: number;
@@ -50,6 +51,10 @@ export function afterNotice(r: Reminder, now: Date): string | null {
   return now.getTime() < Date.parse(r.due) ? r.due : null;
 }
 export function validateReminder(input: any): void {
+  for (const field of ['estimatedHours','actualHours']) {
+    const hours = input?.[field];
+    if (hours != null && (typeof hours !== 'number' || !Number.isFinite(hours) || hours < 0 || hours > 1000000)) throw new Error('Manhours harus berupa angka antara 0 dan 1.000.000 jam.');
+  }
   if (!input || typeof input.title !== 'string' || !input.title.trim() || input.title.length > 160) throw new Error('Judul wajib diisi, maksimal 160 karakter.');
   if (!['task','bill'].includes(input.kind) || !['once','daily','weekly','monthly','yearly','custom'].includes(input.recurrence) || !['seconds','minutes','hours','days','weeks','months','years'].includes(input.unit)) throw new Error('Jenis jadwal tidak valid.');
   if (input.mode !== undefined && !['deadline','ongoing'].includes(input.mode)) throw new Error('Mode reminder tidak valid.');

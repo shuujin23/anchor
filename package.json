@@ -1,6 +1,6 @@
 {
   "name": "anchor-local",
-  "version": "1.4.0",
+  "version": "1.6.0",
   "description": "Personal encrypted vault and local reminders",
   "author": "Personal",
   "private": true,
@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "electron-updater": "^6.8.9",
+    "exceljs": "4.4.0",
     "lucide-react": "^0.468.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

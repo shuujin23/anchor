@@ -7,6 +7,7 @@ import { Store } from './store';
 import { deliverDue } from './scheduler';
 import { AutomaticBackup } from './automatic-backup';
 import { createUpdates } from './updates';
+import { selectTasks, taskWorkbook } from './task-export';
 
 app.setName('Anchor');
 app.setPath('userData', process.env.ANCHOR_DATA_DIR ? path.resolve(process.env.ANCHOR_DATA_DIR) : path.join(app.getPath('appData'),'Anchor'));
@@ -75,10 +76,29 @@ function register() {
     },
     generatePassword:() => { store.requireKey(); const groups = ['ABCDEFGHJKLMNPQRSTUVWXYZ','abcdefghijkmnopqrstuvwxyz','23456789','!@#$%&*-_=+']; const chars = groups.join(''); const result = groups.map(g => g[randomInt(g.length)]); while (result.length < 24) result.push(chars[randomInt(chars.length)]); for (let i = result.length - 1; i > 0; i--) { const j = randomInt(i + 1); [result[i],result[j]] = [result[j],result[i]]; } return result.join(''); },
     reminders:() => store.reminders(),
+    exportTasks:async (arg) => {
+      const tasks = selectTasks(store.reminders(),arg);
+      const result = await dialog.showSaveDialog(win!,{title:'Export task ke Excel',defaultPath:`Anchor-Tasks-${new Date().toISOString().slice(0,10)}.xlsx`,filters:[{name:'Excel workbook',extensions:['xlsx']}]});
+      if (result.canceled || !result.filePath) return false;
+      await taskWorkbook(tasks).xlsx.writeFile(result.filePath); return true;
+    },
     saveReminder:(arg) => { if (arg.discord && !store.get('webhook')) throw new Error('Atur Discord webhook di Pengaturan terlebih dahulu.'); store.saveReminder(arg); },
     reminderAction:(arg) => store.action(arg.id,arg.action,arg.minutes),
+    completeTask:(arg) => {
+      if (!arg || !store.reminders().some(r => r.id === arg.id && r.kind === 'task')) throw new Error('Task tidak ditemukan.');
+      store.action(arg.id,'complete',30,arg.actualHours);
+    },
     deleteReminder:(arg) => store.remove('reminders',arg.id),
     history:() => store.history(),
+    runbooks:() => store.runbooks(),
+    runbook:(arg) => store.runbook(arg.id),
+    saveRunbook:(arg) => store.saveRunbook(arg),
+    deleteRunbook:(arg) => store.removeRunbook(arg.id),
+    runbookSessions:(arg) => store.runbookSessions(arg?.runbookId),
+    runbookSession:(arg) => store.runbookSession(arg.id),
+    startRunbook:(arg) => store.startRunbook(arg.id),
+    runbookSessionAction:(arg) => store.runbookSessionAction(arg),
+    copyText:async(arg) => { if(!arg||typeof arg.text!=='string'||!arg.text||arg.text.length>20000)throw new Error('Teks tidak valid.');clearTimeout(clipboardTimer);await clearClipboard();ownedClipboard=arg.text;await clipboard.writeText(arg.text);clipboardTimer=setTimeout(()=>void clearClipboard().catch(()=>{}),30000); },
     settings:() => settings(),
     pickBackupFolder:async () => {
       store.requireKey();

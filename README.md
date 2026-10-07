@@ -4,7 +4,7 @@ Aplikasi desktop lokal untuk Windows 10/11 x64. React + TypeScript + Electron, d
 
 ## Mulai menggunakan
 
-1. Jalankan `release/Anchor-Setup-1.1.0.exe`, lalu buka Anchor dari desktop atau Start Menu.
+1. Jalankan installer Anchor terbaru, lalu buka Anchor dari desktop atau Start Menu.
 2. Buka **Credentials → Buat vault**. Buat master password minimal 12 karakter. Tidak ada reset password.
 3. Tambahkan credential, task, atau bill. Workspace awal kosong; tidak ada password default atau data contoh.
 4. Di **Pengaturan**, aktifkan **Jalankan saat login Windows**, lalu simpan.
@@ -37,7 +37,19 @@ Jika beberapa jadwal terlewat saat PC mati, Anchor mengirim satu pengingat susul
 
 Task baru memakai mode tanpa deadline secara default. Task lama tetap memakai mode deadline. Untuk mengubah task lama, buka **Edit reminder → Mode task → Tanpa deadline**, periksa waktu mulai dan frekuensi, lalu simpan. Bill selalu memakai jatuh tempo.
 
-### Task dengan deadline dan bill
+### Task dengan deadline (mulai 1.6.0)
+
+Task deadline baru memiliki satu deadline. **Selesai** menutup task secara permanen; **Ulangi pengingat sampai selesai** hanya mengulang notifikasi untuk task tersebut. Deadline yang terlewat tidak otomatis menyelesaikan task. Beralih dari mode tanpa deadline ke deadline memakai satu periode.
+
+Task deadline lama yang berulang tetap dipertahankan dan ditandai **periode lama**. Untuk menghentikan pembuatan periode berikutnya, buka **Edit → Ubah menjadi satu deadline → Simpan reminder**. Tidak ada konversi otomatis pada data lama atau backup.
+
+### Manhours dan export Excel (1.6.0)
+
+Task memiliki **Estimasi manhours** dan **Aktual manhours** dalam jam (opsional, desimal, 0–1.000.000). Kosong berarti belum diisi; nol tetap merupakan nilai yang valid. Aktual dapat diisi ketika menyelesaikan task. Perubahan manhours tidak mereset snooze/jadwal. Pada task lama berperiode, aktual disimpan dalam snapshot riwayat lalu dikosongkan untuk periode berikutnya; estimasi dipertahankan.
+
+Di **Tasks → Export Excel**, pilih **Sesuai filter tampilan dan pencarian** atau **Semua task**, lalu pilih lokasi file `.xlsx`. Ekspor berisi task yang masih tersimpan, termasuk yang selesai/nonaktif; bukan gabungan riwayat periode. Bill, credential, dan runbook tidak disertakan. Kolom memuat manhours, status, waktu lokal, jadwal, dan catatan; total manhours mengikuti filter Excel. Tanggal selesai hanya tersedia untuk penyelesaian mulai versi ini. Manhours ikut backup manual maupun otomatis.
+
+### Bill dan task lama berperiode
 
 **Selesai / Sudah dibayar** menyelesaikan satu periode. Untuk jadwal berulang, periode berikutnya dibuat berdasarkan tanggal jatuh tempo lama, bukan tanggal pembayaran. Jika beberapa periode menunggak, selesaikan masing-masing; aplikasi tidak otomatis menganggap periode yang terlewat sudah dibayar.
 
@@ -64,7 +76,7 @@ Gunakan **Pengaturan → Ekspor backup** dengan password backup minimal 12 karak
 
 **Pulihkan backup** menggabungkan item berdasarkan ID. Item yang sudah ada tetap dipertahankan, sehingga backup lama tidak membatalkan pembayaran yang sudah dicatat. Webhook Discord dan preferensi perangkat tidak ikut dibackup; atur ulang di perangkat baru. Menyalin database saja memerlukan master password asli dan tidak membuat webhook portabel.
 
-Versi 1.1.0 tetap membaca database dan backup versi lama. Backup baru memakai format v2 agar mode tanpa deadline tidak disalahartikan oleh aplikasi 1.0.0; pulihkan backup v2 menggunakan Anchor 1.1.0 atau lebih baru.
+Versi terbaru tetap membaca database dan backup versi lama. Backup v2 memperkenalkan mode tanpa deadline; backup v4 menambahkan runbook terenkripsi dan harus dipulihkan memakai Anchor 1.5.0 atau lebih baru.
 
 ## Pengembangan
 
@@ -103,7 +115,7 @@ Buka Pengaturan → Backup otomatis ke storage eksternal. Aktifkan, pilih folder
 
 Backup berjalan saat vault terkunci selama Anchor berjalan dan PC aktif. Jadwal terlewat dijalankan sekali saat aplikasi aktif kembali. Storage yang terputus dicoba ulang setelah 15 menit. Tanggal 29–31 disesuaikan ke akhir bulan pendek. Setiap file memiliki nama unik; backup lama tidak dihapus otomatis.
 
-File otomatis memakai format v3 dan dipulihkan dengan master password vault asal saat file dibuat, menggunakan Anchor 1.2.0 atau lebih baru. Master password dan kunci pembuka vault tidak disimpan untuk scheduler; hanya kunci enkripsi backup terpisah yang dilindungi safeStorage sistem operasi. Backup tidak membuka credential saat vault terkunci. Backup manual tetap v2 dengan password pilihan pengguna; impor v1/v2 tetap didukung. Preferensi perangkat dan webhook tidak ikut backup.
+File otomatis baru memakai format v4 dan dipulihkan dengan master password vault asal saat file dibuat, menggunakan Anchor 1.5.0 atau lebih baru. Master password dan kunci pembuka vault tidak disimpan untuk scheduler; hanya kunci enkripsi backup terpisah yang dilindungi safeStorage sistem operasi. Backup tidak membuka credential atau runbook saat vault terkunci. Backup manual juga memakai v4 dengan password pilihan pengguna; impor v1–v3 tetap didukung. Preferensi perangkat dan webhook tidak ikut backup.
 
 Status berhasil menunjukkan file sudah ditulis dan dibaca ulang di folder tujuan. Upload cloud ditangani Google Drive for desktop dan harus diperiksa di aplikasi tersebut. Tidak ada akun Google yang dihubungkan atau backup cloud yang diaktifkan otomatis oleh installer.
 
@@ -121,3 +133,13 @@ Verifikasi 1.3.0: build produksi/TypeScript berhasil dan pengujian terakhir lulu
 ## Auto-update — versi 1.4.0
 
 Popup update GitHub Releases dan Pengaturan → Cek update sudah ditambahkan. Build versi ini wajib melalui electron-builder, menggantikan cara installer manual pada panduan lama. Lihat RELEASING.md untuk alur build, draft release, publikasi, dan batas verifikasi.
+
+## Runbook — versi 1.5.0
+
+Halaman Runbooks menyimpan prosedur operasional sebagai langkah berurutan. Setiap langkah dapat berupa instruksi, command, atau URL dan dapat ditautkan ke satu atau beberapa credential. Command dan URL memiliki tombol salin; clipboard dibersihkan otomatis setelah 30 detik.
+
+Memulai eksekusi membuat snapshot checklist baru. Progres sesi tetap tersimpan setelah Anchor ditutup, dengan status per langkah: selesai, dilewati, atau gagal beserta catatan hasil. Template dapat diedit tanpa mengubah sesi aktif maupun riwayat. Menghapus template juga tidak menghapus riwayat eksekusinya.
+
+Isi runbook, command, URL, catatan sesi, dan riwayatnya dienkripsi dengan master password vault. Data hanya dapat dibuka saat vault terbuka. Backup manual dan otomatis format v4 menyertakan runbook serta sesi; backup v1–v3 tetap dapat dipulihkan. Anchor 1.4 dan versi lebih lama tidak dapat membaca backup v4.
+
+Verifikasi 1.5.0: build TypeScript/produksi berhasil, 40/40 tes lulus, dan alur create → start → complete → history diperiksa melalui preview UI lokal. Eksekusi command tetap manual; Anchor hanya menampilkan dan menyalinnya.

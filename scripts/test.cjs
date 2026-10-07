@@ -3,3 +3,5 @@ require.extensions['.ts']=(module,filename)=>{const source=fs.readFileSync(filen
 require('../tests/core.test.ts');
 require('../tests/automatic-backup.test.ts');
 require('../tests/updates.test.cjs');
+require('../tests/runbooks.test.ts');
+require('../tests/task-features.test.ts');
