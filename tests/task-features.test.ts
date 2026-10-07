@@ -8,6 +8,22 @@ import { Reminder, validateReminder } from '../electron/schedule';
 import { deliverDue } from '../electron/scheduler';
 import { derive, salt } from '../electron/crypto';
 import { selectTasks, taskWorkbook } from '../electron/task-export';
+import { taskView } from '../electron/task-view';
+
+test('created range uses inclusive local calendar days, open bounds and export ordering',()=>{
+  const at=(d:number,h=0)=>new Date(2026,9,d,h,59,59,999).toISOString();
+  const rows=[task({id:'a',createdAt:at(6)}),task({id:'b',createdAt:at(7,23)}),task({id:'c',createdAt:at(8)}),task({id:'missing',createdAt:undefined})];
+  const ids=(items:Reminder[])=>items.map(r=>r.id);
+  assert.deepEqual(ids(taskView(rows,{dateFrom:'2026-10-07',dateTo:'2026-10-07'})),['b']);
+  assert.deepEqual(ids(taskView(rows,{dateFrom:'2026-10-07',sort:'created-desc'})),['c','b']);
+  assert.deepEqual(ids(taskView(rows,{dateTo:'2026-10-07',sort:'created-asc'})),['a','b']);
+  assert.deepEqual(ids(taskView(rows,{sort:'created-desc'})),['c','b','a','missing']);
+  const options={scope:'filtered' as const,filter:'all',query:'restart',dateFrom:'2026-10-06',dateTo:'2026-10-07',sort:'created-desc' as const};
+  assert.deepEqual(ids(selectTasks(rows,options)),ids(taskView(rows,options)));
+  assert.equal(selectTasks(rows,{...options,scope:'all'}).length,4);
+  assert.throws(()=>taskView(rows,{dateFrom:'2026-10-08',dateTo:'2026-10-07'}));
+  assert.throws(()=>taskView(rows,{dateFrom:'2026-02-30'}));
+});
 
 const root = path.resolve(process.env.ANCHOR_TEST_ROOT || '.test-data');
 async function store() { fs.mkdirSync(root,{recursive:true}); const s=new Store(path.join(fs.mkdtempSync(path.join(root,'task-')),'anchor.db'));await s.open();return s; }

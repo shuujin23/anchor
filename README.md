@@ -45,6 +45,8 @@ Task deadline lama yang berulang tetap dipertahankan dan ditandai **periode lama
 
 ### Manhours dan export Excel (1.6.0)
 
+Halaman Tasks menyediakan urutan **Jadwal terdekat**, **Dibuat terbaru**, atau **Dibuat terlama**, serta filter **Dibuat dari / Sampai tanggal** berdasarkan tanggal pembuatan task. Salah satu batas boleh kosong; tanggal akhir mencakup seluruh hari dalam zona waktu lokal. Filter dapat digabung dengan status dan pencarian. **Reset tanggal** menghapus kedua batas. Ekspor sesuai filter mengikuti rentang tanggal dan urutan tampilan; ekspor semua task mengabaikan filter tetapi tetap mengikuti urutan pilihan.
+
 Task memiliki **Estimasi manhours** dan **Aktual manhours** dalam jam (opsional, desimal, 0–1.000.000). Kosong berarti belum diisi; nol tetap merupakan nilai yang valid. Aktual dapat diisi ketika menyelesaikan task. Perubahan manhours tidak mereset snooze/jadwal. Pada task lama berperiode, aktual disimpan dalam snapshot riwayat lalu dikosongkan untuk periode berikutnya; estimasi dipertahankan.
 
 Di **Tasks → Export Excel**, pilih **Sesuai filter tampilan dan pencarian** atau **Semua task**, lalu pilih lokasi file `.xlsx`. Ekspor berisi task yang masih tersimpan, termasuk yang selesai/nonaktif; bukan gabungan riwayat periode. Bill, credential, dan runbook tidak disertakan. Kolom memuat manhours, status, waktu lokal, jadwal, dan catatan; total manhours mengikuti filter Excel. Tanggal selesai hanya tersedia untuk penyelesaian mulai versi ini. Manhours ikut backup manual maupun otomatis.

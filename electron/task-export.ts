@@ -1,13 +1,11 @@
 import ExcelJS from 'exceljs';
 import { Reminder } from './schedule';
+import { taskView, TaskViewOptions } from './task-view';
 
-export type TaskExportOptions = { scope: 'all' | 'filtered'; filter?: string; query?: string };
+export type TaskExportOptions = TaskViewOptions & { scope: 'all' | 'filtered' };
 export function selectTasks(reminders: Reminder[], options: TaskExportOptions): Reminder[] {
   if (!options || !['all','filtered'].includes(options.scope) || (options.scope === 'filtered' && (!['all','active','paused','done'].includes(options.filter || '') || typeof options.query !== 'string' || options.query.length > 10000))) throw new Error('Pilihan ekspor task tidak valid.');
-  return reminders.filter(r => r.kind === 'task' && (options.scope === 'all' || (
-    r.title.toLowerCase().includes(options.query!.toLowerCase()) && (options.filter === 'all' ||
-    options.filter === 'active' && r.enabled && !r.completed || options.filter === 'paused' && !r.enabled && !r.completed || options.filter === 'done' && r.completed)
-  ))).sort((a,b) => (a.mode === 'ongoing' ? a.nextNotify || a.due : a.due).localeCompare(b.mode === 'ongoing' ? b.nextNotify || b.due : b.due));
+  return taskView(reminders, options.scope === 'all' ? {sort:options.sort} : options);
 }
 const names: Record<string,string> = { once:'Sekali',daily:'Harian',weekly:'Mingguan',monthly:'Bulanan',yearly:'Tahunan' };
 const units: Record<string,string> = { seconds:'detik',minutes:'menit',hours:'jam',days:'hari',weeks:'minggu',months:'bulan',years:'tahun' };
