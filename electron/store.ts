@@ -8,6 +8,7 @@ export type RunbookStep = { id:string; title:string; type:'instruction'|'command
 export type Runbook = { id:string; title:string; category:string; description:string; credentialIds:string[]; steps:RunbookStep[]; createdAt:string; updatedAt:string };
 export type RunbookSession = { id:string; runbookId:string; title:string; category:string; credentialIds:string[]; steps:(RunbookStep&{status:'pending'|'done'|'skipped'|'failed';note:string})[]; status:'running'|'completed'|'abandoned'; startedAt:string; updatedAt:string; finishedAt:string|null };
 export class Store {
+  prepareReminder?: (reminder:Reminder,input:any,old?:Reminder)=>void;
   db!: Database; key: Buffer | null = null; lastActivity = Date.now();
   constructor(public file: string) {}
   async open() {
@@ -107,6 +108,8 @@ export class Store {
     r.estimatedHours = input.kind === 'task' ? input.estimatedHours ?? null : null;
     r.actualHours = input.kind === 'task' ? input.actualHours ?? null : null;
     r.completedAt = old?.completedAt ?? null;
+    if(this.prepareReminder)this.prepareReminder(r,input,old);
+    else if(input.syncToSheets)throw new Error('Google Sheets Sync belum tersedia.');
     if (scheduleChanged) { r.nextNotify = r.completed ? null : firstNotice(r); r.lastNotified = null; }
     this.transaction(() => this.putReminder(r));
   }
@@ -195,7 +198,7 @@ export class Store {
     // Merge by ID. Existing records win; restoring an older backup cannot revert payment state.
     this.transaction(() => {
       for (const c of data.credentials) this.db.run('INSERT OR IGNORE INTO credentials VALUES (?,?)',[c.id,encrypt(JSON.stringify(c),key)]);
-      for (const r of data.reminders) this.db.run('INSERT OR IGNORE INTO reminders VALUES (?,?)',[r.id,JSON.stringify(r)]);
+      for (const r of data.reminders) this.db.run('INSERT OR IGNORE INTO reminders VALUES (?,?)',[r.id,JSON.stringify({...r,syncToSheets:r.syncToSheets === undefined ? undefined : false,sheetTarget:undefined})]);
       for (const h of data.history) this.db.run('INSERT OR IGNORE INTO history VALUES (?,?)',[h.id,JSON.stringify(h)]);
       for(const r of data.runbooks)this.db.run('INSERT OR IGNORE INTO runbooks VALUES (?,?)',[r.id,encrypt(JSON.stringify(r),key)]);
       for(const s of data.runbookSessions)this.db.run('INSERT OR IGNORE INTO runbook_sessions VALUES (?,?)',[s.id,encrypt(JSON.stringify(s),key)]);

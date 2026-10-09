@@ -6,3 +6,5 @@ release/
 *.anchor
 .test-data/
 .npm-cache/
+*.anchor-license
+*private*.pem

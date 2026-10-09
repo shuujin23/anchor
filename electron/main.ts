@@ -8,6 +8,8 @@ import { deliverDue } from './scheduler';
 import { AutomaticBackup } from './automatic-backup';
 import { createUpdates } from './updates';
 import { selectTasks, taskWorkbook } from './task-export';
+import { License } from './license';
+import { SheetsSync } from './sheets-sync';
 
 app.setName('Anchor');
 app.setPath('userData', process.env.ANCHOR_DATA_DIR ? path.resolve(process.env.ANCHOR_DATA_DIR) : path.join(app.getPath('appData'),'Anchor'));
@@ -16,6 +18,7 @@ const single = app.requestSingleInstanceLock();
 if (!single) app.quit();
 let win: BrowserWindow | null = null, tray: Tray, store: Store, quitting = false, ticking = false;
 let automaticBackup: AutomaticBackup;
+let sheetsSync: SheetsSync, license: License;
 let updates: ReturnType<typeof createUpdates>;
 let clipboardTimer: NodeJS.Timeout | undefined, ownedClipboard: string | null = null;
 let lastUnlock = 0;
@@ -100,6 +103,26 @@ function register() {
     runbookSessionAction:(arg) => store.runbookSessionAction(arg),
     copyText:async(arg) => { if(!arg||typeof arg.text!=='string'||!arg.text||arg.text.length>20000)throw new Error('Teks tidak valid.');clearTimeout(clipboardTimer);await clearClipboard();ownedClipboard=arg.text;await clipboard.writeText(arg.text);clipboardTimer=setTimeout(()=>void clearClipboard().catch(()=>{}),30000); },
     settings:() => settings(),
+    sheetsState:() => ({...sheetsSync.state(),tasks:sheetsSync.statuses()}),
+    activateSheets:(arg) => {license.activate(arg?.key);},
+    importSheetsLicense:async () => {
+      const result=await dialog.showOpenDialog(win!,{title:'Pilih key aktivasi Anchor',filters:[{name:'Anchor license',extensions:['anchor-license','txt']}],properties:['openFile']});
+      if(result.canceled)return false;
+      if(fs.statSync(result.filePaths[0]).size>4096)throw new Error('File key terlalu besar.');
+      license.activate(fs.readFileSync(result.filePaths[0],'utf8'));return true;
+    },
+    deactivateSheets:() => sheetsSync.deactivate(),
+    importSheetsCredential:async () => {
+      license.require();store.requireKey();
+      const result=await dialog.showOpenDialog(win!,{title:'Pilih JSON service account Google',filters:[{name:'Google service account',extensions:['json']}],properties:['openFile']});
+      if(result.canceled)return false;
+      if(fs.statSync(result.filePaths[0]).size>100000)throw new Error('File credential terlalu besar.');
+      sheetsSync.importCredential(fs.readFileSync(result.filePaths[0],'utf8'));return true;
+    },
+    inspectSheets:(arg) => sheetsSync.inspect(arg?.spreadsheetId),
+    configureSheets:(arg) => sheetsSync.configure(arg),
+    pauseSheets:() => sheetsSync.pause(),
+    syncSheetsNow:() => sheetsSync.run(true),
     pickBackupFolder:async () => {
       store.requireKey();
       const result=await dialog.showOpenDialog(win!,{title:'Pilih folder Google Drive atau storage eksternal',defaultPath:automaticBackup.settings().folder || undefined,properties:['openDirectory','createDirectory']});
@@ -157,6 +180,11 @@ if (single) app.whenReady().then(async () => {
     if (fs.existsSync(path.dirname(shortcut))) shell.writeShortcutLink(shortcut,'create',{target:process.execPath,cwd:path.dirname(process.execPath),description:'Anchor · Personal vault and reminders',icon:process.execPath,iconIndex:0,appUserModelId:'local.anchor.desktop'});
   }
   store = new Store(path.join(app.getPath('userData'),'anchor.db')); await store.open();
+  license = new License(store);
+  sheetsSync = new SheetsSync(store,license,{
+    seal:value=>{if(!safeStorage.isEncryptionAvailable()||(process.platform==='linux'&&safeStorage.getSelectedStorageBackend()==='basic_text'))throw new Error('Penyimpanan credential terenkripsi tidak tersedia.');return safeStorage.encryptString(value).toString('base64');},
+    unseal:value=>safeStorage.decryptString(Buffer.from(value,'base64'))
+  });
   automaticBackup = new AutomaticBackup(store,{
     seal:(value) => {
       if (!safeStorage.isEncryptionAvailable()) throw new Error('Penyimpanan kunci terenkripsi Windows tidak tersedia.');
@@ -183,6 +211,8 @@ if (single) app.whenReady().then(async () => {
   setInterval(() => void tick(),1000); void tick();
   setInterval(() => void automaticBackup.runDue().catch(()=>{}),60000);
   void automaticBackup.runDue().catch(()=>{});
+  setInterval(()=>void sheetsSync.run().catch(()=>{}),15000);
+  void sheetsSync.run().catch(()=>{});
 }).catch(() => { dialog.showErrorBox('Anchor gagal dibuka','Database tidak bisa dibuka. Periksa izin folder data atau pulihkan backup.'); app.quit(); });
 app.on('second-instance',show);
 app.on('before-quit',() => { quitting = true; if (store) store.lock(); void clearClipboard().catch(()=>{}); });

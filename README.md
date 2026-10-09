@@ -15,6 +15,31 @@ Installer belum ditandatangani dengan sertifikat penerbit. Aplikasi ini dibuat u
 
 ## Fitur
 
+### Google Sheets Sync beraktivasi (1.7.0)
+
+1. Buka **Pengaturan → Aktivasi fitur → Pilih file key**, atau tempel key aktivasi. Tanpa key valid, pengaturan sync dan checkbox pada task disembunyikan; backend juga menolak akses sync.
+2. Buka vault, lalu **Pilih JSON credential Google**. Gunakan service account dengan Sheets API aktif dan izin Editor pada spreadsheet. Credential disalin ke penyimpanan lokal terenkripsi dengan proteksi akun OS; path file asal tidak diperlukan sesudah impor.
+3. Masukkan URL spreadsheet, klik **Muat daftar PIC**, pilih tab PIC yang sudah ada, lalu **Simpan & aktifkan sync**. PIC dipilih dari ID tab, bukan input nama bebas.
+4. Centang **Sinkronkan ke Google Sheets** pada task yang diinginkan. Task baru tidak otomatis diikutkan. Task deadline lama berperiode harus dikonversi menjadi satu deadline terlebih dahulu.
+
+Kolom A–E tab PIC harus berurutan: `No.`, `Task`, `Tanggal Mengerjakan`, `Manhours`, `Catatan`. Satu task satu baris. Tanggal memakai `createdAt` dalam zona waktu spreadsheet; manhours memakai aktual (kosong tetap kosong). Judul dan catatan ditulis sebagai teks, bukan formula. Baris baru disisipkan di bawah header dan diberi metadata ID task; update berikutnya mencari metadata tersebut agar tidak bergantung pada nomor baris. Baris manual tidak ditimpa. Mengubah PIC default hanya memengaruhi task yang pertama kali diaktifkan; tujuan task lama dipertahankan.
+
+Sync satu arah, Anchor sebagai sumber data. Antrean berasal dari task lokal dan sidik data terakhir yang sudah dikirim, sehingga bertahan setelah restart. Worker memeriksa setiap 15 detik, maksimal lima task per putaran. Gagal koneksi dicoba ulang dengan jeda 2–30 menit; **Sync sekarang** mencoba antrean tanpa menunggu jeda. Status ada di daftar task dan Pengaturan. Aplikasi harus berjalan; sync tetap bekerja saat vault terkunci. **Jeda sync**, opt-out task, dan penghapusan task tidak menghapus baris remote. Permintaan yang sudah dikirim mungkin masih selesai ketika sync dijeda. Jika metadata/baris remote hilang setelah pernah tersinkron, aplikasi berhenti dengan error agar tidak menambah duplikat tanpa sengaja.
+
+Credential Google, aktivasi, dan konfigurasi koneksi tidak ikut backup. Task hasil restore dinonaktifkan sync-nya dan harus diikutkan kembali secara eksplisit. Jangan menjalankan dua salinan database yang sama sebagai sumber sync bersamaan.
+
+#### Penerbitan key (khusus pemilik aplikasi)
+
+Aktivasi memakai tanda tangan Ed25519, tanpa server, tanpa masa berlaku atau pengikatan perangkat. Installer hanya membawa `electron/license-public.ts`. Private signing key harus disimpan terpisah dari repository/installer dan dibackup oleh pemilik. Jangan regenerasi key publik setelah membagikan key aktivasi, karena key lama tidak akan valid lagi. Aktivasi offline tidak mendukung pencabutan jarak jauh dan bukan proteksi terhadap modifikasi source aplikasi.
+
+Untuk menerbitkan key pengguna baru dengan private key pemilik yang sudah ada:
+
+```powershell
+node scripts/license-tool.cjs issue "C:\lokasi-privat\issuer-private.pem" "C:\lokasi-output\pengguna.anchor-license" "Nama pengguna"
+```
+
+Bagikan hanya file `.anchor-license` ke pengguna yang diberi akses. Credential Google tetap terpisah dan perlu diatur pada perangkatnya. CLI menolak menulis ulang file key/output yang sudah ada. Perintah `init` hanya untuk bootstrap pasangan kunci baru sebelum distribusi, bukan untuk rilis rutin.
+
 - Credential kategori Server, Billing, Akun, dan Lainnya. Field nama, username, alamat, password/token, dan catatan semuanya terenkripsi di database.
 - Pencarian credential, edit/hapus, password generator 24 karakter, dan salin password. Tampilan password disembunyikan kembali setelah 15 detik.
 - Daily, weekly, monthly, yearly, sekali, atau custom setiap N hari/minggu/bulan/tahun.

@@ -1,4 +1,6 @@
 export type Reminder = {
+  syncToSheets?: boolean;
+  sheetTarget?: {spreadsheetId:string;sheetId:number;pic:string;timeZone:string};
   // Missing mode means a legacy deadline reminder. In ongoing mode `due` is the
   // first reminder time, not a deadline; nextNotify tracks delivery independently.
   mode?: 'deadline' | 'ongoing';
@@ -51,6 +53,7 @@ export function afterNotice(r: Reminder, now: Date): string | null {
   return now.getTime() < Date.parse(r.due) ? r.due : null;
 }
 export function validateReminder(input: any): void {
+  if(input?.syncToSheets !== undefined && typeof input.syncToSheets !== 'boolean')throw new Error('Pilihan sync tidak valid.');
   for (const field of ['estimatedHours','actualHours']) {
     const hours = input?.[field];
     if (hours != null && (typeof hours !== 'number' || !Number.isFinite(hours) || hours < 0 || hours > 1000000)) throw new Error('Manhours harus berupa angka antara 0 dan 1.000.000 jam.');

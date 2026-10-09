@@ -5,3 +5,4 @@ require('../tests/automatic-backup.test.ts');
 require('../tests/updates.test.cjs');
 require('../tests/runbooks.test.ts');
 require('../tests/task-features.test.ts');
+require('../tests/sheets-sync.test.ts');
