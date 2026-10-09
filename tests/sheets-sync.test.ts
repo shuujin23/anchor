@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { generateKeyPairSync, sign } from 'node:crypto';
+import { createHash, generateKeyPairSync, sign } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Store } from '../electron/store';
@@ -32,8 +32,8 @@ test('activation enforced in backend; unselected tasks and bills are not uploade
  f.setActive(true);await assert.rejects(f.sync.configure({...target,sheetId:999,enabled:true}));assert.throws(()=>f.store.saveReminder({...f.task,kind:'bill',syncToSheets:true}));
  await f.sync.run();assert.equal(f.calls(),0);
 });
-test('sync updates one row, captures created date and actual hours, and preserves destination across default changes',async()=>{
- const f=await fixture();f.store.saveReminder({...f.task,syncToSheets:true});const r=f.store.reminders()[0];await f.sync.run();assert.equal(f.rows.size,1);assert.equal(f.rows.get(r.id)!.hours,null);assert.equal(f.rows.get(r.id)!.date,sheetDate(r.createdAt,'Asia/Jakarta'));
+test('note task sync updates one row, captures created date and actual hours, and preserves destination across default changes',async()=>{
+ const f=await fixture();f.store.saveReminder({...f.task,mode:'note',syncToSheets:true});const r=f.store.reminders()[0];assert.equal(r.nextNotify,null);await f.sync.run();assert.equal(f.rows.size,1);assert.equal(f.rows.get(r.id)!.hours,null);assert.equal(f.rows.get(r.id)!.date,sheetDate(r.createdAt,'Asia/Jakarta'));
  f.store.action(r.id,'complete',30,2.5);await f.sync.run();assert.equal(f.rows.size,1);assert.equal(f.rows.get(r.id)!.hours,2.5);assert.equal(f.sync.statuses()[r.id].status,'Tersinkron');
  await f.sync.configure({...target,sheetId:1,enabled:true});f.store.saveReminder({...f.store.reminders()[0],notes:'new note'});assert.equal(f.store.reminders()[0].sheetTarget!.sheetId,0);await f.sync.run();assert.equal(f.rows.get(r.id)!.notes,'new note');
  f.store.remove('reminders',r.id);await f.sync.run();assert.equal(f.rows.size,1);
@@ -47,6 +47,13 @@ test('offline changes persist across restart, retry avoids duplicates after lost
 test('backup restore never silently enables outgoing sync or carries Google credentials',async()=>{
  const f=await fixture();f.store.saveReminder({...f.task,syncToSheets:true});const backup=f.store.exportBackup('backup sheets password');const other=await fixture();other.store.importBackup(backup,'backup sheets password');const restored=other.store.reminders()[0];assert.equal(restored.syncToSheets,false);assert.equal(restored.sheetTarget,undefined);
 });
+test('previous mapping is resynced once into Detail Task without requiring a task edit',async()=>{
+ const f=await fixture();f.store.saveReminder({...f.task,mode:'note',syncToSheets:true});const r=f.store.reminders()[0];
+ const oldRow={taskId:r.id,title:r.title,date:sheetDate(r.createdAt,target.timeZone),hours:null,notes:r.notes};
+ f.store.transaction(()=>f.store.set('sheets.task:'+id+':'+r.id,JSON.stringify({hash:createHash('sha256').update(JSON.stringify(oldRow)).digest('hex'),lastSync:new Date().toISOString()})));
+ assert.equal(f.sync.statuses()[r.id].status,'Menunggu');await f.sync.run();assert.equal(f.calls(),1);assert.equal(f.rows.get(r.id)!.notes,r.notes);
+ await f.sync.run();assert.equal(f.calls(),1);assert.equal(f.sync.statuses()[r.id].status,'Tersinkron');
+});
 test('Google date conversion uses sheet timezone and credential input cannot redirect endpoints',()=>{
  assert.equal(sheetDate('2026-10-08T18:00:00Z','Asia/Jakarta'),sheetDate('2026-10-09T10:00:00Z','Asia/Jakarta'));
  assert.equal(spreadsheetId('https://docs.google.com/spreadsheets/d/'+id+'/edit'),id);assert.throws(()=>spreadsheetId('https://evil.example/'));
@@ -58,14 +65,17 @@ test('Google API atomically inserts metadata with row, retries by identity, uses
   const u=String(url),body=init?.body;let result:any={};
   if(u.includes('oauth2'))result={access_token:'TEST_TOKEN'};
   else if(u.includes('?fields='))result={properties:{title:'Work',timeZone:'Asia/Jakarta'},sheets:[{properties:{sheetId:0,title:'Ujun',sheetType:'GRID'}}]};
-  else if(u.includes('/values/'))result={values:[[wrongHeader?'Oops':'No.','Task','Tanggal Mengerjakan','Manhours','Catatan']]};
+  else if(u.includes('/values/'))result={values:[[wrongHeader?'Oops':'No.','Task','Detail Task','Tanggal Mengerjakan','Manhours','Catatan']]};
   else if(u.endsWith('/developerMetadata:search'))result={matchedDeveloperMetadata:exists?[{developerMetadata:{metadataId:10,location:{dimensionRange:{sheetId:0,dimension:'ROWS',startIndex:3,endIndex:4}}}}]:[]};
   else{bodies.push(JSON.parse(body));exists=true;}
   return new Response(JSON.stringify(result),{status:200,headers:{'content-type':'application/json'}});
  }) as typeof fetch;
  const client=new GoogleSheets(parseCredential(credential),http),row={taskId:'unique-task',title:'=DANGEROUS()',date:46000,hours:null,notes:'+formula'};
  await client.upsert(target,row,false,()=>true);assert.equal(bodies[0].requests.length,3);assert.equal(bodies[0].requests[1].updateCells.rows[0].values[1].userEnteredValue.stringValue,row.title);assert.equal(bodies[0].requests[2].createDeveloperMetadata.developerMetadata.metadataValue,row.taskId);
- await client.upsert(target,{...row,hours:0},false,()=>true);assert.equal(bodies[1].valueInputOption,'RAW');assert.equal(bodies[1].data[0].values[0][3],0);assert.equal(bodies[1].data[0].dataFilter.developerMetadataLookup.metadataId,10);
+ const inserted=bodies[0].requests[1].updateCells.rows[0].values;
+ assert.equal(inserted.length,5);assert.equal(inserted[2].userEnteredValue.stringValue,row.notes);assert.equal(inserted[3].userEnteredValue.numberValue,row.date);
+ await client.upsert(target,{...row,hours:0},false,()=>true);assert.equal(bodies[1].valueInputOption,'RAW');assert.equal(bodies[1].data[0].values[0][4],0);assert.equal(bodies[1].data[0].dataFilter.developerMetadataLookup.metadataId,10);
+ assert.deepEqual(bodies[1].data[0].values[0],[null,row.title,row.notes,row.date,0]); // F is absent, so manual Catatan is untouched.
  wrongHeader=true;await assert.rejects(client.upsert(target,row,true,()=>true));assert.equal(bodies.length,2);
  wrongHeader=false;exists=false;await assert.rejects(client.upsert(target,row,true,()=>true));assert.equal(bodies.length,2);
  await client.upsert(target,row,false,()=>false);assert.equal(bodies.length,2);

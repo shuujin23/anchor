@@ -20,7 +20,7 @@ export function taskView<T extends Task>(items: T[], options: TaskViewOptions): 
     (!options.filter || options.filter === 'all' || options.filter === 'active' && r.enabled && !r.completed || options.filter === 'paused' && !r.enabled && !r.completed || options.filter === 'done' && r.completed) &&
     (!(options.dateFrom || options.dateTo) || Date.parse(r.createdAt ?? '') >= start && Date.parse(r.createdAt ?? '') < end)
   ).sort((a,b) => {
-    const value = (r: T) => Date.parse(sort === 'schedule' ? (r.mode === 'ongoing' ? r.nextNotify || r.due : r.due) : r.createdAt ?? '');
+    const value = (r: T) => Date.parse(sort === 'schedule' ? (r.mode === 'note' ? '' : r.mode === 'ongoing' ? r.nextNotify || r.due : r.due) : r.createdAt ?? '');
     const av=value(a),bv=value(b);
     // Records without a valid creation date remain last in either direction.
     if (!Number.isFinite(av) || !Number.isFinite(bv)) return Number.isFinite(av)?-1:Number.isFinite(bv)?1:0;

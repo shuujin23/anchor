@@ -10,7 +10,7 @@ import { SheetsPanel } from './SheetsPanel';
 declare global { interface Window { anchor: { call<T = any>(command: string,arg?: any): Promise<T>; onLock(callback: () => void): () => void } } }
 const api = <T = any,>(command: string,arg?: any) => window.anchor.call<T>(command,arg);
 type Credential = { id?:string;title:string;username:string;url:string;password:string;notes:string;category:string;updatedAt?:string };
-type Reminder = {syncToSheets?:boolean;sheetTarget?:{pic:string};createdAt?:string;estimatedHours?:number|null;actualHours?:number|null;mode?:'deadline'|'ongoing';id?:string;title:string;kind:'task'|'bill';notes:string;amount:number;currency:string;due:string;recurrence:string;every:number;unit:string;leadMinutes:number;repeatMinutes:number;windows:boolean;discord:boolean;enabled:boolean;completed:boolean;nextNotify?:string|null};
+type Reminder = {syncToSheets?:boolean;sheetTarget?:{pic:string};createdAt?:string;estimatedHours?:number|null;actualHours?:number|null;mode?:'deadline'|'ongoing'|'note';id?:string;title:string;kind:'task'|'bill';notes:string;amount:number;currency:string;due:string;recurrence:string;every:number;unit:string;leadMinutes:number;repeatMinutes:number;windows:boolean;discord:boolean;enabled:boolean;completed:boolean;nextNotify?:string|null};
 type Page = 'overview'|'credentials'|'runbooks'|'tasks'|'bills'|'history'|'settings';
 const fmtDate = (v:string) => new Date(v).toLocaleString('id-ID',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit'});
 const money = (v:number,c='IDR') => new Intl.NumberFormat('id-ID',{style:'currency',currency:c,maximumFractionDigits:c === 'IDR' ? 0 : 2}).format(v);
@@ -19,7 +19,7 @@ const names: Record<string,string> = {once:'Sekali',daily:'Harian',weekly:'Mingg
 const units: Record<string,string> = {seconds:'detik',minutes:'menit',hours:'jam',days:'hari',weeks:'minggu',months:'bulan',years:'tahun'};
 const recurrenceLabel = (r:Reminder) => r.recurrence === 'custom' ? `Setiap ${r.every} ${units[r.unit]}` : names[r.recurrence];
 const freshReminder = (kind:'task'|'bill'):Reminder => ({title:'',kind,mode:kind === 'task' ? 'ongoing' : 'deadline',notes:'',amount:0,currency:'IDR',due:new Date(Date.now()+3600000).toISOString(),recurrence:kind === 'bill' ? 'monthly':'daily',every:1,unit:'days',leadMinutes:0,repeatMinutes:0,windows:true,discord:false,enabled:true,completed:false});
-const hasDeadline = (r:Reminder) => r.mode !== 'ongoing';
+const hasDeadline = (r:Reminder) => r.mode !== 'ongoing' && r.mode !== 'note';
 const reminderTime = (r:Reminder) => hasDeadline(r) ? r.due : (r.nextNotify || r.due);
 const isOverdue = (r:Reminder) => hasDeadline(r) && Date.parse(r.due) < Date.now();
 const freshCredential = ():Credential => ({title:'',username:'',url:'',password:'',notes:'',category:'Akun'});
@@ -54,7 +54,7 @@ function App() {
   useEffect(() => { if (!toast) return; const t = setTimeout(()=>setToast(''),4500); return ()=>clearTimeout(t); },[toast]);
   useEffect(() => { setQuery('');setFilter('active'); },[page]);
   const active = reminders.filter(r=>r.enabled&&!r.completed), overdue = active.filter(isOverdue);
-  const upcoming = [...active].sort((a,b)=>reminderTime(a).localeCompare(reminderTime(b)));
+  const upcoming = active.filter(r=>r.mode!=='note').sort((a,b)=>reminderTime(a).localeCompare(reminderTime(b)));
   const currentMonth = new Date().getMonth(), currentYear = new Date().getFullYear();
   const billsThisMonth = active.filter(r=>r.kind==='bill'&&new Date(r.due).getMonth()===currentMonth&&new Date(r.due).getFullYear()===currentYear);
   function navigate(p:Page) { setPage(p);setError(''); }
@@ -62,9 +62,9 @@ function App() {
   function complete(r:Reminder) { if(r.kind==='task'){setCompletionTask(r);return;} setConfirmation({title:r.kind==='bill'?'Tandai sudah dibayar?':'Selesaikan task?',body:!hasDeadline(r)?`“${r.title}” akan selesai dan seluruh pengingat berulangnya berhenti.`:r.recurrence==='once'?`“${r.title}” akan ditandai selesai.`:`Periode ${fmtDate(r.due)} akan selesai. Periode berikutnya tetap terjadwal. Jika ada tunggakan beberapa periode, selesaikan satu per satu.`,run:async()=>{await api('reminderAction',{id:r.id,action:'complete'});setConfirmation(null);}}); }
   const reminderRows = (items:Reminder[]) => items.length ? <div className="reminder-list">{items.map(r=><div className="reminder-row" key={r.id}>
     <div className={'item-icon '+(r.kind==='bill'?'purple':'blue')}>{r.kind==='bill'?<Receipt size={20}/>:<ListTodo size={20}/>}</div>
-    <div className="reminder-info"><strong>{r.title}</strong><div className="meta"><span>{hasDeadline(r) ? fmtDate(r.due) : 'Tanpa deadline'}</span><span>·</span><span>{recurrenceLabel(r)}{r.kind==='task'&&hasDeadline(r)&&r.recurrence!=='once'?' (periode lama)':''}</span>{r.repeatMinutes>0&&<span title="Ulangi sampai selesai">· ulang {r.repeatMinutes} menit</span>}</div>{!r.completed&&r.nextNotify&&<div className="next-notice">Notifikasi berikutnya: {fmtDate(r.nextNotify)}</div>}{sheets?.license.active&&r.syncToSheets&&<div className="next-notice" title={sheets.tasks?.[r.id!]?.error}>Google Sheets · {r.sheetTarget?.pic} · {sheets.tasks?.[r.id!]?.status || 'Menunggu'}{sheets.tasks?.[r.id!]?.error&&' — '+sheets.tasks[r.id!].error}</div>}</div>
-    <div className="row-value">{r.kind==='task'&&<span className="task-hours">Estimasi {r.estimatedHours ?? '—'} · Aktual {r.actualHours ?? '—'} MH</span>}{r.kind==='bill'&&<strong>{money(r.amount,r.currency)}</strong>}<span className={'badge '+(r.completed?'green':!r.enabled?'neutral':isOverdue(r)?'red':'blue')}>{r.completed?'Selesai':!r.enabled?'Nonaktif':isOverdue(r)?'Terlewat':'Terjadwal'}</span></div>
-    <div className="row-actions">{!r.completed&&<><button className="icon-button" title={r.kind==='bill'?'Sudah dibayar':'Selesai'} aria-label={`Selesaikan ${r.title}`} disabled={busy} onClick={()=>complete(r)}><Check size={18}/></button><button className="icon-button" title="Snooze 30 menit" disabled={busy||!r.enabled} onClick={()=>act(()=>api('reminderAction',{id:r.id,action:'snooze',minutes:30}),'Ditunda 30 menit')}><Clock3 size={18}/></button><button className="icon-button" title={r.enabled?'Nonaktifkan jadwal':'Aktifkan jadwal'} disabled={busy} onClick={()=>act(()=>api('reminderAction',{id:r.id,action:'toggle'}))}>{r.enabled?<Pause size={17}/>:<Play size={17}/>}</button></>}<button className="icon-button" title="Edit reminder" onClick={()=>setReminder({...r})}><Pencil size={16}/></button><button className="icon-button danger-icon" title="Hapus reminder" onClick={()=>deleteReminder(r)}><Trash2 size={16}/></button></div>
+    <div className="reminder-info"><strong>{r.title}</strong><div className="meta"><span>{r.mode==='note'?'Catatan task':hasDeadline(r) ? fmtDate(r.due) : 'Tanpa deadline'}</span><span>·</span><span>{r.mode==='note'?'Tanpa pengingat':recurrenceLabel(r)}{r.kind==='task'&&hasDeadline(r)&&r.recurrence!=='once'?' (periode lama)':''}</span>{r.repeatMinutes>0&&<span title="Ulangi sampai selesai">· ulang {r.repeatMinutes} menit</span>}</div>{!r.completed&&r.nextNotify&&<div className="next-notice">Notifikasi berikutnya: {fmtDate(r.nextNotify)}</div>}{sheets?.license.active&&r.syncToSheets&&<div className="next-notice" title={sheets.tasks?.[r.id!]?.error}>Google Sheets · {r.sheetTarget?.pic} · {sheets.tasks?.[r.id!]?.status || 'Menunggu'}{sheets.tasks?.[r.id!]?.error&&' — '+sheets.tasks[r.id!].error}</div>}</div>
+    <div className="row-value">{r.kind==='task'&&<span className="task-hours">Estimasi {r.estimatedHours ?? '—'} · Aktual {r.actualHours ?? '—'} MH</span>}{r.kind==='bill'&&<strong>{money(r.amount,r.currency)}</strong>}<span className={'badge '+(r.completed?'green':!r.enabled?'neutral':isOverdue(r)?'red':'blue')}>{r.completed?'Selesai':!r.enabled?'Nonaktif':isOverdue(r)?'Terlewat':r.mode==='note'?'Aktif':'Terjadwal'}</span></div>
+    <div className="row-actions">{!r.completed&&<><button className="icon-button" title={r.kind==='bill'?'Sudah dibayar':'Selesai'} aria-label={`Selesaikan ${r.title}`} disabled={busy} onClick={()=>complete(r)}><Check size={18}/></button>{r.mode!=='note'&&<button className="icon-button" title="Snooze 30 menit" disabled={busy||!r.enabled} onClick={()=>act(()=>api('reminderAction',{id:r.id,action:'snooze',minutes:30}),'Ditunda 30 menit')}><Clock3 size={18}/></button>}<button className="icon-button" title={r.mode==='note'?(r.enabled?'Nonaktifkan task':'Aktifkan task'):r.enabled?'Nonaktifkan jadwal':'Aktifkan jadwal'} disabled={busy} onClick={()=>act(()=>api('reminderAction',{id:r.id,action:'toggle'}))}>{r.enabled?<Pause size={17}/>:<Play size={17}/>}</button></>}<button className="icon-button" title="Edit reminder" onClick={()=>setReminder({...r})}><Pencil size={16}/></button><button className="icon-button danger-icon" title="Hapus reminder" onClick={()=>deleteReminder(r)}><Trash2 size={16}/></button></div>
   </div>)}</div> : <Empty icon={<CalendarDays/>} title="Belum ada reminder di sini" text="Tambahkan task atau tagihan. Anchor akan mengingatkan saat waktunya tiba."/>;
   if (!window.anchor) return <div className="fatal">Buka Anchor melalui aplikasi desktop. Integrasi lokal tidak tersedia di browser biasa.</div>;
   return <div className="app-shell">
@@ -87,7 +87,7 @@ function App() {
     {(page==='tasks'||page==='bills')&&<><div className="page-heading"><div><div className="eyebrow">{page==='tasks'?'ONE THING AT A TIME':'STAY ON TOP OF PAYMENTS'}</div><h1>{page==='tasks'?'Tasks & reminders':'Bills & payments'}</h1><p>{page==='tasks'?'Jadwalkan, tunda, dan selesaikan. Biar Anchor yang mengingatkan.':'Pantau jatuh tempo dan catat pembayaran untuk setiap periode.'}</p></div><button className="primary" onClick={()=>setReminder(freshReminder(page==='tasks'?'task':'bill'))}><Plus size={18}/>{page==='tasks'?'Tambah task':'Tambah bill'}</button></div>
       {page==='tasks'&&<div className="task-export-bar"><label>Urutkan<select value={taskSort} onChange={e=>setTaskSort(e.target.value as TaskViewOptions["sort"])}><option value="schedule">Jadwal terdekat</option><option value="created-desc">Dibuat terbaru</option><option value="created-asc">Dibuat terlama</option></select></label><label>Dibuat dari<input type="date" min="2000-01-01" max={dateTo || "2200-12-31"} value={dateFrom} onChange={e=>setDateFrom(e.target.value)}/></label><label>Sampai tanggal<input type="date" min={dateFrom || "2000-01-01"} max="2200-12-31" value={dateTo} onChange={e=>setDateTo(e.target.value)}/></label>{(dateFrom||dateTo)&&<button className="text-button" onClick={()=>{setDateFrom('');setDateTo('');}}>Reset tanggal</button>}<button className="secondary" disabled={busy||invalidRange} onClick={()=>setExportOpen(true)}><Download size={16}/>Export Excel</button></div>}
       <div className="toolbar"><div className="tabs">{[['active','Aktif'],['paused','Nonaktif'],['done','Selesai'],['all','Semua']].map(([v,label])=><button key={v} className={filter===v?'active':''} onClick={()=>setFilter(v)}>{label}</button>)}</div><div className="search-box"><Search size={17}/><input aria-label="Cari reminder" placeholder="Cari reminder…" value={query} onChange={e=>setQuery(e.target.value)}/></div></div><section className="panel">{page==='tasks'&&invalidRange?<p role="alert" className="error-banner">{dateError}</p>:reminderRows(page==='tasks'?taskView(reminders,{filter,query,sort:taskSort,dateFrom,dateTo}):reminders.filter(r=>r.kind==='bill'&&r.title.toLowerCase().includes(query.toLowerCase())&&(filter==='all'||filter==='active'&&r.enabled&&!r.completed||filter==='paused'&&!r.enabled&&!r.completed||filter==='done'&&r.completed)).sort((a,b)=>reminderTime(a).localeCompare(reminderTime(b))))}</section></>}
-    {page==='history'&&<><div className="page-heading"><div><div className="eyebrow">A LITTLE PROGRESS, EVERY DAY</div><h1>Riwayat penyelesaian</h1><p>Task yang selesai dan tagihan yang sudah dibayar. Menampilkan 200 aktivitas terbaru.</p></div></div><section className="panel">{history.length?history.map(h=><div className="history-row" key={h.id}><div className="item-icon green"><CircleCheck size={21}/></div><div className="grow"><strong>{h.title}</strong><div className="meta">{h.mode === 'ongoing' ? 'Tanpa deadline' : `Periode ${fmtDate(h.due)}`} · Selesai {fmtDate(h.completedAt)}</div></div>{h.kind==='bill'&&<strong>{money(h.amount,h.currency)}</strong>}<span className="badge green">{h.kind==='bill'?'Dibayar':'Selesai'}</span></div>):<Empty icon={<CircleCheck/>} title="Awal yang baru" text="Task dan pembayaran yang kamu selesaikan akan muncul di sini."/>}</section></>}
+    {page==='history'&&<><div className="page-heading"><div><div className="eyebrow">A LITTLE PROGRESS, EVERY DAY</div><h1>Riwayat penyelesaian</h1><p>Task yang selesai dan tagihan yang sudah dibayar. Menampilkan 200 aktivitas terbaru.</p></div></div><section className="panel">{history.length?history.map(h=><div className="history-row" key={h.id}><div className="item-icon green"><CircleCheck size={21}/></div><div className="grow"><strong>{h.title}</strong><div className="meta">{h.mode==='note'?'Catatan task':h.mode === 'ongoing' ? 'Tanpa deadline' : `Periode ${fmtDate(h.due)}`} · Selesai {fmtDate(h.completedAt)}</div></div>{h.kind==='bill'&&<strong>{money(h.amount,h.currency)}</strong>}<span className="badge green">{h.kind==='bill'?'Dibayar':'Selesai'}</span></div>):<Empty icon={<CircleCheck/>} title="Awal yang baru" text="Task dan pembayaran yang kamu selesaikan akan muncul di sini."/>}</section></>}
     {page==='settings'&&settings&&<><div className="page-heading"><div><div className="eyebrow">MAKE IT YOURS</div><h1>Pengaturan</h1><p>Atur cara Anchor bekerja untukmu.</p></div></div><SheetsPanel state={sheets} busy={busy} act={act} unlocked={status.unlocked} onUnlock={()=>setAuth(true)}/><SettingsPanel settings={settings} busy={busy} act={act} unlocked={status.unlocked} onUnlock={()=>setAuth(true)} onBackup={setBackup}/></>}
     </>}
     </div></main>
@@ -120,24 +120,24 @@ function CredentialModal({initial,busy,onClose,onSave,onGenerate,onDelete}:any) 
 }
 function CompleteTaskModal({task,busy,onClose,onComplete}:any) {
   const [hours,setHours] = useState<number|null>(task.actualHours ?? null);
-  return <Modal title="Selesaikan task?" onClose={onClose}><form onSubmit={e=>{e.preventDefault();onComplete(hours);}}><p className="dialog-copy">{task.title}. {task.mode!=='ongoing'&&task.recurrence!=='once'?'Task lama ini akan berlanjut ke periode berikutnya; aktual manhours direset untuk periode baru.':'Seluruh pengingat task ini akan berhenti.'}</p><label>Aktual manhours (jam, opsional)<input type="number" min="0" max="1000000" step="0.01" placeholder="Belum diisi" value={hours ?? ''} onChange={e=>setHours(e.target.value===''?null:Number(e.target.value))}/></label><div className="modal-footer"><button type="button" className="secondary" onClick={onClose}>Batal</button><button className="primary" disabled={busy}>Selesaikan task</button></div></form></Modal>;
+  return <Modal title="Selesaikan task?" onClose={onClose}><form onSubmit={e=>{e.preventDefault();onComplete(hours);}}><p className="dialog-copy">{task.title}. {task.mode==='note'?'Task akan ditandai selesai.':task.mode!=='ongoing'&&task.recurrence!=='once'?'Task lama ini akan berlanjut ke periode berikutnya; aktual manhours direset untuk periode baru.':'Seluruh pengingat task ini akan berhenti.'}</p><label>Aktual manhours (jam, opsional)<input type="number" min="0" max="1000000" step="0.01" placeholder="Belum diisi" value={hours ?? ''} onChange={e=>setHours(e.target.value===''?null:Number(e.target.value))}/></label><div className="modal-footer"><button type="button" className="secondary" onClick={onClose}>Batal</button><button className="primary" disabled={busy}>Selesaikan task</button></div></form></Modal>;
 }
 function ReminderModal({sheets,initial,busy,onClose,onSave}:any) {
   const [r,setR] = useState<Reminder>({...initial,mode:initial.mode ?? 'deadline'});
-  const ongoing = r.mode === 'ongoing';
-  const legacyRecurring = r.kind === 'task' && !ongoing && r.recurrence !== 'once';
+  const ongoing = r.mode === 'ongoing', note = r.mode === 'note';
+  const legacyRecurring = r.kind === 'task' && !ongoing && !note && r.recurrence !== 'once';
   const set = (key:keyof Reminder,value:any) => setR(r=>({...r,[key]:value}));
-  const changeMode = (mode:'deadline'|'ongoing') => setR(r=>({
-    ...r,mode,
-    recurrence:mode === 'deadline' ? 'once' : r.recurrence === 'once' ? 'daily' : r.recurrence,
+  const changeMode = (mode:'deadline'|'ongoing'|'note') => setR(r=>({
+    ...r,mode,due:mode==='note'?'':r.due||new Date(Date.now()+3600000).toISOString(),windows:mode==='note'?false:r.mode==='note'?true:r.windows,discord:mode==='note'?false:r.discord,
+    recurrence:mode !== 'ongoing' ? 'once' : r.recurrence === 'once' ? 'daily' : r.recurrence,
     leadMinutes:0,repeatMinutes:0
   }));
   return <Modal title={r.id?'Edit reminder':r.kind==='bill'?'Bill baru':'Task baru'} subtitle="Atur jadwal dan kapan kamu ingin diingatkan." onClose={onClose} wide>
     <form onSubmit={e=>{e.preventDefault();onSave(r);}}>
       <label>Judul<input autoFocus required maxLength={160} placeholder={r.kind==='bill'?'Contoh: Perpanjangan VPS':'Contoh: Lanjutkan belajar bahasa'} value={r.title} onChange={e=>set('title',e.target.value)}/></label>
       {r.kind === 'task' && <label>Mode task
-        <select value={r.mode} onChange={e=>changeMode(e.target.value as 'deadline'|'ongoing')}>
-          <option value="ongoing">Tanpa deadline — ulang sampai selesai</option>
+        <select value={r.mode} onChange={e=>changeMode(e.target.value as 'deadline'|'ongoing'|'note')}>
+          <option value="note">Catatan task saja — tanpa jadwal</option><option value="ongoing">Tanpa deadline — ulang sampai selesai</option>
           <option value="deadline">Dengan deadline / jatuh tempo</option>
         </select>
       </label>}
@@ -147,29 +147,29 @@ function ReminderModal({sheets,initial,busy,onClose,onSave}:any) {
         <label>Nominal<input type="number" min="0" max="1000000000000000" step="0.01" required value={r.amount} onChange={e=>set('amount',Number(e.target.value))}/></label>
         <label>Mata uang<select value={r.currency} onChange={e=>set('currency',e.target.value)}>{['IDR','USD','EUR','SGD'].map(v=><option key={v}>{v}</option>)}</select></label>
       </div>}
-      <div className="form-grid">
+      {!note&&<div className="form-grid">
         <label>{ongoing?'Mulai pengingat (waktu lokal)':'Jatuh tempo (waktu lokal)'}
           <input required step="1" type="datetime-local" min="2000-01-01T00:00" max="2200-12-31T23:59:59" value={localDate(r.due)} onChange={e=>{if(e.target.value)set('due',new Date(e.target.value).toISOString());}}/>
         </label>
         {(ongoing||r.kind==='bill')&&<label>Jadwal berulang<select value={r.recurrence} onChange={e=>set('recurrence',e.target.value)}>
           {Object.entries(names).filter(([v])=>!ongoing||v!=='once').map(([v,label])=><option key={v} value={v}>{label}</option>)}
         </select></label>}
-      </div>
+      </div>}
       {(ongoing||r.kind==='bill')&&r.recurrence==='custom'&&<div className="form-grid">
         <label>Setiap<input type="number" required min="1" max="365" value={r.every} onChange={e=>set('every',Number(e.target.value))}/></label>
         <label>Satuan<select value={r.unit} onChange={e=>set('unit',e.target.value)}>{Object.entries(units).map(([v,label])=><option key={v} value={v}>{label}</option>)}</select></label>
       </div>}
-      {!ongoing&&<div className="form-grid">
+      {!ongoing&&!note&&<div className="form-grid">
         <label>Ingatkan sebelum jatuh tempo<select value={r.leadMinutes} onChange={e=>set('leadMinutes',Number(e.target.value))}>{[[0,'Saat jatuh tempo'],[30,'30 menit sebelumnya'],[60,'1 jam sebelumnya'],[1440,'H-1'],[4320,'H-3'],[10080,'H-7']].map(([v,label])=><option key={v} value={v}>{label}</option>)}</select></label>
         <label>Ulangi pengingat sampai selesai<select value={r.repeatMinutes} onChange={e=>set('repeatMinutes',Number(e.target.value))}>{[[0,'Tidak diulang'],[5,'Setiap 5 menit'],[15,'Setiap 15 menit'],[30,'Setiap 30 menit'],[60,'Setiap 1 jam'],[240,'Setiap 4 jam'],[1440,'Setiap hari']].map(([v,label])=><option key={v} value={v}>{label}</option>)}</select></label>
       </div>}
-      <div className="form-hint">{ongoing
+      <div className="form-hint">{note?'Task ini tidak memiliki deadline atau notifikasi. Manhours dan Google Sheets Sync tetap tersedia.':ongoing
         ? 'Waktu mulai menentukan jam pengingat, bukan batas penyelesaian. Pengingat terus muncul sesuai jadwal sampai task ditandai Selesai atau dinonaktifkan. Contoh: Harian mulai pukul 09.00 berarti setiap hari pukul 09.00.'
         : r.kind==='bill' ? 'Jadwal berulang membuat periode berikutnya setelah dibayar. Pengingat berulang berlaku untuk periode yang masih terbuka.' : legacyRecurring ? 'Periode lama dipertahankan. Pilih Ubah menjadi satu deadline agar selesai menutup task secara permanen.' : 'Satu deadline untuk task ini. Pengingat dapat berulang sampai selesai atau dinonaktifkan. Melewati deadline tidak otomatis menyelesaikan task.'}</div>
-      <div className="channel-options">
+      {!note&&<div className="channel-options">
         <label className="checkbox"><input type="checkbox" checked={r.windows} onChange={e=>set('windows',e.target.checked)}/><Bell size={17}/>Notifikasi Windows</label>
         <label className="checkbox"><input type="checkbox" checked={r.discord} onChange={e=>set('discord',e.target.checked)}/>Discord webhook</label>
-      </div>
+      </div>}
       {r.kind==='task'&&sheets?.license.active&&<><label className="checkbox"><input type="checkbox" checked={!!r.syncToSheets} disabled={!r.syncToSheets&&(!sheets.config||!sheets.hasCredential||legacyRecurring)} onChange={e=>set('syncToSheets',e.target.checked)}/>Sinkronkan ke Google Sheets</label><p className="form-hint">{r.sheetTarget?.pic||sheets.config?.pic?('PIC: '+(r.sheetTarget?.pic||sheets.config?.pic)+'. Judul, tanggal dibuat, aktual manhours, dan catatan akan dikirim.'): 'Atur koneksi dan pilih PIC di Pengaturan terlebih dahulu.'}{legacyRecurring?' Ubah menjadi satu deadline untuk memakai sync.':''}</p></>}
       <label>Catatan (tidak dienkripsi)<textarea rows={2} value={r.notes} maxLength={10000} onChange={e=>set('notes',e.target.value)} placeholder="Jangan isi password atau token di sini."/></label>
       <div className="modal-footer"><button type="button" className="secondary" onClick={onClose}>Batal</button><button className="primary" disabled={busy}>Simpan reminder</button></div>

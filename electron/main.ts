@@ -85,7 +85,7 @@ function register() {
       if (result.canceled || !result.filePath) return false;
       await taskWorkbook(tasks).xlsx.writeFile(result.filePath); return true;
     },
-    saveReminder:(arg) => { if (arg.discord && !store.get('webhook')) throw new Error('Atur Discord webhook di Pengaturan terlebih dahulu.'); store.saveReminder(arg); },
+    saveReminder:(arg) => { if (arg.mode!=='note' && arg.discord && !store.get('webhook')) throw new Error('Atur Discord webhook di Pengaturan terlebih dahulu.'); store.saveReminder(arg); },
     reminderAction:(arg) => store.action(arg.id,arg.action,arg.minutes),
     completeTask:(arg) => {
       if (!arg || !store.reminders().some(r => r.id === arg.id && r.kind === 'task')) throw new Error('Task tidak ditemukan.');

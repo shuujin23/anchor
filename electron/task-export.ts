@@ -30,12 +30,12 @@ export function taskWorkbook(tasks: Reminder[], now = new Date()) {
   ];
   tasks.forEach((r,index) => {
     const cadence = r.recurrence === 'custom' ? `Setiap ${r.every} ${units[r.unit]}` : names[r.recurrence];
-    sheet.addRow({no:index+1,title:r.title,mode:r.mode === 'ongoing' ? 'Tanpa deadline' : 'Dengan deadline',
-      status:r.completed?'Selesai':!r.enabled?'Nonaktif':r.mode !== 'ongoing' && Date.parse(r.due)<now.getTime()?'Terlewat':'Terjadwal',
-      created:localDate(r.createdAt),start:r.mode === 'ongoing'?localDate(r.due):null,due:r.mode !== 'ongoing'?localDate(r.due):null,
+    sheet.addRow({no:index+1,title:r.title,mode:r.mode==='note'?'Catatan task':r.mode === 'ongoing' ? 'Tanpa deadline' : 'Dengan deadline',
+      status:r.completed?'Selesai':!r.enabled?'Nonaktif':r.mode !== 'note' && r.mode !== 'ongoing' && Date.parse(r.due)<now.getTime()?'Terlewat':r.mode==='note'?'Aktif':'Terjadwal',
+      created:localDate(r.createdAt),start:r.mode === 'ongoing'?localDate(r.due):null,due:r.mode !== 'note' && r.mode !== 'ongoing'?localDate(r.due):null,
       completed:localDate(r.completedAt),estimate:r.estimatedHours ?? null,actual:r.actualHours ?? null,
-      cadence:r.mode !== 'ongoing' && r.recurrence !== 'once'?`${cadence} (periode lama)`:cadence,
-      lead:r.mode === 'ongoing'?null:r.leadMinutes,repeat:r.mode === 'ongoing'?null:r.repeatMinutes,notes:r.notes});
+      cadence:r.mode==='note'?'Tidak ada':r.mode !== 'ongoing' && r.recurrence !== 'once'?`${cadence} (periode lama)`:cadence,
+      lead:r.mode === 'note'||r.mode === 'ongoing'?null:r.leadMinutes,repeat:r.mode === 'note'||r.mode === 'ongoing'?null:r.repeatMinutes,notes:r.notes});
   });
   for (const key of ['created','start','due','completed']) sheet.getColumn(key).numFmt = 'dd mmm yyyy hh:mm:ss';
   for (const key of ['estimate','actual']) sheet.getColumn(key).numFmt = '0.00';

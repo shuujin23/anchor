@@ -2,7 +2,7 @@ import { Store } from './store';
 import { afterNotice, Reminder } from './schedule';
 const tokenFor = (r: Reminder) => JSON.stringify([r.due,r.nextNotify,r.windows,r.discord,r.title,r.mode,r.recurrence,r.every,r.unit,r.leadMinutes,r.repeatMinutes]);
 export async function deliverDue(store: Store, sendWindows: (title:string,body:string)=>void, sendDiscord: (body:string)=>Promise<void>, now = new Date()) {
-  const due = store.reminders().filter(r=>r.enabled&&!r.completed&&r.nextNotify&&Date.parse(r.nextNotify)<=now.getTime()).sort((a,b)=>a.nextNotify!.localeCompare(b.nextNotify!)).slice(0,5);
+  const due = store.reminders().filter(r=>r.mode!=='note'&&r.enabled&&!r.completed&&r.nextNotify&&Date.parse(r.nextNotify)<=now.getTime()).sort((a,b)=>a.nextNotify!.localeCompare(b.nextNotify!)).slice(0,5);
   for (const r of due) {
     const token=tokenFor(r), pendingKey='delivery:'+r.id;
     let pending=JSON.parse(store.get(pendingKey)||'{}');

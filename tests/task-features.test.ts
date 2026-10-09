@@ -26,6 +26,13 @@ test('created range uses inclusive local calendar days, open bounds and export o
 });
 
 const root = path.resolve(process.env.ANCHOR_TEST_ROOT || '.test-data');
+
+test('note task exports without artificial dates, cadence or reminder intervals',()=>{
+  const sheet=taskWorkbook([task({mode:'note',due:'',anchor:'',recurrence:'once',windows:false,repeatMinutes:0})]).getWorksheet('Tasks')!;
+  assert.equal(sheet.getCell('C2').value,'Catatan task');assert.equal(sheet.getCell('D2').value,'Aktif');
+  for(const col of ['F','G','L','M'])assert.equal(sheet.getCell(col+'2').value,null);
+  assert.equal(sheet.getCell('K2').value,'Tidak ada');
+});
 async function store() { fs.mkdirSync(root,{recursive:true}); const s=new Store(path.join(fs.mkdtempSync(path.join(root,'task-')),'anchor.db'));await s.open();return s; }
 function task(patch:Partial<Reminder> = {}): Reminder {return {id:'task',kind:'task',mode:'deadline',title:'Restart server',notes:'Step 1\nStep 2',amount:0,currency:'IDR',due:'2026-10-01T09:00:00.000Z',anchor:'2026-10-01T09:00:00.000Z',recurrence:'once',every:1,unit:'days',leadMinutes:0,repeatMinutes:5,windows:true,discord:false,enabled:true,completed:false,nextNotify:null,lastNotified:null,createdAt:'2026-09-30T09:00:00.000Z',...patch};}
 function create(s:Store,patch:Partial<Reminder> = {}) { const {id,...input}=task(patch);s.saveReminder(input);return s.reminders()[0]; }

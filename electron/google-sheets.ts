@@ -17,7 +17,7 @@ export function sheetDate(iso:string,timeZone:string):number {
   const n=(key:string)=>Number(parts.find(p=>p.type===key)!.value);
   return (Date.UTC(n('year'),n('month')-1,n('day'))-Date.UTC(1899,11,30))/86400000;
 }
-const header=['No.','Task','Tanggal Mengerjakan','Manhours','Catatan'];
+const header=['No.','Task','Detail Task','Tanggal Mengerjakan','Manhours','Catatan'];
 export class GoogleSheets implements SheetsAPI {
   private token='';private expires=0;
   constructor(private credential:ServiceCredential,private http:typeof fetch=fetch){}
@@ -45,9 +45,9 @@ export class GoogleSheets implements SheetsAPI {
     const info=await this.inspect(target.spreadsheetId),sheet=info.sheets.find(s=>s.id===target.sheetId);
     if(!sheet)throw new Error('Tab PIC tujuan sudah tidak tersedia.');
     if(info.timeZone!==target.timeZone)throw new Error('Zona waktu spreadsheet berubah. Periksa pengaturan sebelum sinkronisasi.');
-    const range="'"+sheet.title.replaceAll("'","''")+"'!A1:E1";
+    const range="'"+sheet.title.replaceAll("'","''")+"'!A1:F1";
     const values=await this.request(target.spreadsheetId,'/values/'+encodeURIComponent(range));
-    if(header.some((text,i)=>values.values?.[0]?.[i]!==text))throw new Error('Header PIC harus: No., Task, Tanggal Mengerjakan, Manhours, Catatan.');
+    if(header.some((text,i)=>values.values?.[0]?.[i]!==text))throw new Error('Header PIC harus: No., Task, Detail Task, Tanggal Mengerjakan, Manhours, Catatan.');
     const lookup={metadataKey:'anchor.taskId',metadataValue:row.taskId,visibility:'DOCUMENT'};
     const found=await this.request(target.spreadsheetId,'/developerMetadata:search',{dataFilters:[{developerMetadataLookup:lookup}]});
     const matches=found.matchedDeveloperMetadata ?? [];
@@ -56,8 +56,8 @@ export class GoogleSheets implements SheetsAPI {
     if(matches.length){
       const metadata=matches[0].developerMetadata,location=metadata.location?.dimensionRange;
       if(location?.sheetId!==target.sheetId||location?.dimension!=='ROWS'||location.startIndex<1||location.endIndex!==location.startIndex+1)throw new Error('Baris task berpindah ke lokasi yang tidak sesuai.');
-      // RAW prevents task titles/notes from being interpreted as formulas. Null preserves No.
-      await this.request(target.spreadsheetId,'/values:batchUpdateByDataFilter',{valueInputOption:'RAW',data:[{dataFilter:{developerMetadataLookup:{metadataId:metadata.metadataId}},majorDimension:'ROWS',values:[[null,row.title,row.date,row.hours ?? '',row.notes]]}]});
+      // RAW treats titles/details as text. Null preserves No.; omit F to preserve manual Catatan.
+      await this.request(target.spreadsheetId,'/values:batchUpdateByDataFilter',{valueInputOption:'RAW',data:[{dataFilter:{developerMetadataLookup:{metadataId:metadata.metadataId}},majorDimension:'ROWS',values:[[null,row.title,row.notes,row.date,row.hours ?? '']]}]});
     }else{
       if(known)throw new Error('Baris tersinkron hilang atau identitasnya dihapus. Pulihkan baris beserta metadata sebelum mencoba lagi.');
       // Insert a dedicated row below the header and attach identity in the same atomic request.
@@ -67,9 +67,9 @@ export class GoogleSheets implements SheetsAPI {
         {insertDimension:{range:{sheetId:target.sheetId,dimension:'ROWS',startIndex:1,endIndex:2},inheritFromBefore:false}},
         {updateCells:{start:{sheetId:target.sheetId,rowIndex:1,columnIndex:0},rows:[{values:[
           {userEnteredValue:{formulaValue:'=ROW()-1'}},{userEnteredValue:{stringValue:row.title}},
+          {userEnteredValue:{stringValue:row.notes}},
           {userEnteredValue:{numberValue:row.date},userEnteredFormat:{numberFormat:{type:'DATE',pattern:'dd/mm/yyyy'}}},
-          {...(row.hours===null?{}:{userEnteredValue:{numberValue:row.hours}}),userEnteredFormat:{numberFormat:{type:'NUMBER',pattern:'0.00'}}},
-          {userEnteredValue:{stringValue:row.notes}}
+          {...(row.hours===null?{}:{userEnteredValue:{numberValue:row.hours}}),userEnteredFormat:{numberFormat:{type:'NUMBER',pattern:'0.00'}}}
         ]}],fields:'userEnteredValue,userEnteredFormat.numberFormat'}},
         {createDeveloperMetadata:{developerMetadata:{metadataId,metadataKey:'anchor.taskId',metadataValue:row.taskId,visibility:'DOCUMENT',location:{dimensionRange:{sheetId:target.sheetId,dimension:'ROWS',startIndex:1,endIndex:2}}}}}
       ]});

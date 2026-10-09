@@ -24,7 +24,7 @@ export class SheetsSync {
   private recordKey(r:Reminder){return 'sheets.task:'+r.sheetTarget!.spreadsheetId+':'+r.id;}
   private record(r:Reminder):RecordState{return JSON.parse(this.store.get(this.recordKey(r))||'{}');}
   private row(r:Reminder){return {taskId:r.id,title:r.title,date:sheetDate(r.createdAt,r.sheetTarget!.timeZone),hours:r.actualHours ?? null,notes:r.notes};}
-  private hash(r:Reminder){return createHash('sha256').update(JSON.stringify(this.row(r))).digest('hex');}
+  private hash(r:Reminder){return createHash('sha256').update(JSON.stringify({mapping:'detail-task-v2',row:this.row(r)})).digest('hex');}
   state(){return {license:this.license.state(),config:this.license.state().active?this.config():null,hasCredential:!!this.store.get('sheets.credential'),busy:this.busy};}
   statuses(){
     if(!this.license.state().active)return {};

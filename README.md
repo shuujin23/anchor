@@ -15,6 +15,10 @@ Installer belum ditandatangani dengan sertifikat penerbit. Aplikasi ini dibuat u
 
 ## Fitur
 
+### Catatan task tanpa jadwal (1.7.1)
+
+Pilih **Mode task → Catatan task saja — tanpa jadwal** untuk menulis task dan manhours tanpa mengisi tanggal atau kanal notifikasi. Google Sheets Sync tetap tersedia setelah aktivasi. Task ini tidak muncul dalam agenda terdekat, tidak dianggap terlambat, dan dapat ditandai selesai. Mengubah task terjadwal ke mode ini menghapus jadwal pengingatnya; beralih kembali ke mode berjadwal meminta tanggal baru. Ekspor menampilkan tanggal mulai/deadline kosong. Perubahan judul, aktual manhours, dan catatan pada task yang diikutkan sync memperbarui baris Google yang sama; tanggal pengerjaan tetap mengikuti tanggal dibuat.
+
 ### Google Sheets Sync beraktivasi (1.7.0)
 
 1. Buka **Pengaturan → Aktivasi fitur → Pilih file key**, atau tempel key aktivasi. Tanpa key valid, pengaturan sync dan checkbox pada task disembunyikan; backend juga menolak akses sync.
@@ -22,7 +26,7 @@ Installer belum ditandatangani dengan sertifikat penerbit. Aplikasi ini dibuat u
 3. Masukkan URL spreadsheet, klik **Muat daftar PIC**, pilih tab PIC yang sudah ada, lalu **Simpan & aktifkan sync**. PIC dipilih dari ID tab, bukan input nama bebas.
 4. Centang **Sinkronkan ke Google Sheets** pada task yang diinginkan. Task baru tidak otomatis diikutkan. Task deadline lama berperiode harus dikonversi menjadi satu deadline terlebih dahulu.
 
-Kolom A–E tab PIC harus berurutan: `No.`, `Task`, `Tanggal Mengerjakan`, `Manhours`, `Catatan`. Satu task satu baris. Tanggal memakai `createdAt` dalam zona waktu spreadsheet; manhours memakai aktual (kosong tetap kosong). Judul dan catatan ditulis sebagai teks, bukan formula. Baris baru disisipkan di bawah header dan diberi metadata ID task; update berikutnya mencari metadata tersebut agar tidak bergantung pada nomor baris. Baris manual tidak ditimpa. Mengubah PIC default hanya memengaruhi task yang pertama kali diaktifkan; tujuan task lama dipertahankan.
+Kolom A–F tab PIC harus berurutan: `No.`, `Task`, `Detail Task`, `Tanggal Mengerjakan`, `Manhours`, `Catatan`. Catatan Anchor masuk ke Detail Task (C). Catatan di Sheet (F) tidak ditimpa dan tetap tersedia untuk isian manual. Versi 1.7.1 mengirim ulang task yang diikutkan sync sekali untuk mengisi pemetaan baru; isi Catatan lama di F tetap dipertahankan. Satu task satu baris. Tanggal memakai `createdAt` dalam zona waktu spreadsheet; manhours memakai aktual (kosong tetap kosong). Judul dan catatan ditulis sebagai teks, bukan formula. Baris baru disisipkan di bawah header dan diberi metadata ID task; update berikutnya mencari metadata tersebut agar tidak bergantung pada nomor baris. Baris manual tidak ditimpa. Mengubah PIC default hanya memengaruhi task yang pertama kali diaktifkan; tujuan task lama dipertahankan.
 
 Sync satu arah, Anchor sebagai sumber data. Antrean berasal dari task lokal dan sidik data terakhir yang sudah dikirim, sehingga bertahan setelah restart. Worker memeriksa setiap 15 detik, maksimal lima task per putaran. Gagal koneksi dicoba ulang dengan jeda 2–30 menit; **Sync sekarang** mencoba antrean tanpa menunggu jeda. Status ada di daftar task dan Pengaturan. Aplikasi harus berjalan; sync tetap bekerja saat vault terkunci. **Jeda sync**, opt-out task, dan penghapusan task tidak menghapus baris remote. Permintaan yang sudah dikirim mungkin masih selesai ketika sync dijeda. Jika metadata/baris remote hilang setelah pernah tersinkron, aplikasi berhenti dengan error agar tidak menambah duplikat tanpa sengaja.
 

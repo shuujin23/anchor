@@ -12,6 +12,21 @@ function reminder(overrides:Partial<Reminder> = {}):Reminder {return {id:'test',
 async function store() {const dir=fs.mkdtempSync(path.join(root,'vault-'));const s=new Store(path.join(dir,'anchor.db'));await s.open();return s;}
 const credential={title:'Production',username:'root',url:'10.0.0.1',password:'SUPER_SECRET_938271',notes:'SECRET_RECOVERY_82391',category:'Server'};
 
+test('note tasks have no dates or deliveries, survive backup and convert to/from scheduled tasks',async()=>{
+  const s=await store();const {id,...input}=reminder({kind:'task',mode:'note',estimatedHours:2,actualHours:1});
+  s.saveReminder(input);let r=s.reminders()[0];
+  assert.equal(r.due,'');assert.equal(r.anchor,'');assert.equal(r.nextNotify,null);assert.equal(r.windows,false);assert.equal(r.discord,false);
+  assert.equal(firstNotice(r),null);assert.equal(nextDue(r),null);assert.equal(afterNotice(r,new Date()),null);
+  assert.throws(()=>s.action(r.id,'snooze'));assert.throws(()=>validateReminder({...r,kind:'bill'}));
+  // Defend against stale delivery state from old data or a concurrent send.
+  s.transaction(()=>s.putReminder({...r,nextNotify:'2020-01-01T00:00:00Z'}));let sent=0;
+  await deliverDue(s,()=>{sent++;},async()=>{sent++;});assert.equal(sent,0);
+  s.saveReminder({...r,mode:'deadline',due:'2027-01-01T00:00:00Z',windows:true});r=s.reminders()[0];assert.ok(r.nextNotify);
+  s.saveReminder({...r,mode:'note'});r=s.reminders()[0];assert.equal(r.nextNotify,null);
+  s.setup('note source password');const t=await store();t.setup('note target password');t.importBackup(s.exportBackup('note backup password'),'note backup password');assert.equal(t.reminders()[0].mode,'note');assert.equal(t.reminders()[0].due,'');
+  s.action(r.id,'complete',30,1.5);assert.equal(s.reminders()[0].completed,true);assert.equal(s.reminders()[0].nextNotify,null);assert.equal(s.history()[0].actualHours,1.5);
+});
+
 test('short custom intervals advance exactly and skip years of missed seconds',()=>{
   const start=new Date('2020-01-01T00:00:00Z');
   for(const [unit,ms] of [['seconds',1000],['minutes',60000],['hours',3600000]] as const){

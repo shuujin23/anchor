@@ -93,10 +93,11 @@ export class Store {
   reminders(): Reminder[] { return this.rows('reminders').map(r => JSON.parse(r.payload)); }
   putReminder(r: Reminder) { this.db.run('INSERT OR REPLACE INTO reminders VALUES (?,?)',[r.id,JSON.stringify(r)]); }
   saveReminder(input: any) {
+    if(input?.mode==='note')input={...input,due:'',recurrence:'once',every:1,unit:'days',leadMinutes:0,repeatMinutes:0,windows:false,discord:false};
     validateReminder(input);
     const old = input.id ? this.reminders().find(r => r.id === input.id) : undefined;
     if (input.id && !old) throw new Error('Reminder tidak ditemukan.');
-    const due = new Date(input.due).toISOString();
+    const due = input.mode==='note' ? '' : new Date(input.due).toISOString();
     const mode = input.mode ?? 'deadline';
     // Preserve an existing recurring deadline, but do not create new ones for tasks.
     if (input.kind === 'task' && mode === 'deadline' && input.recurrence !== 'once') {
@@ -129,7 +130,7 @@ export class Store {
         else { r.completed = true; r.nextNotify = null; r.completedAt = h.completedAt; }
       } else if (action === 'toggle') { r.enabled = !r.enabled; }
       else if (action === 'snooze') {
-        if (![10,30,60,240,1440].includes(minutes) || r.completed) throw new Error('Snooze tidak valid.');
+        if (r.mode==='note' || ![10,30,60,240,1440].includes(minutes) || r.completed) throw new Error('Snooze tidak valid.');
         r.nextNotify = new Date(Date.now() + minutes * 60000).toISOString();
       } else throw new Error('Aksi tidak valid.');
       this.putReminder(r);
@@ -190,7 +191,7 @@ export class Store {
     }
     data.runbooks=data.runbooks||[];data.runbookSessions=data.runbookSessions||[];
     if (!Array.isArray(data.credentials) || !Array.isArray(data.reminders) || !Array.isArray(data.history) || !Array.isArray(data.runbooks) || !Array.isArray(data.runbookSessions) || data.credentials.length + data.reminders.length + data.history.length + data.runbooks.length + data.runbookSessions.length > 50000) throw new Error('Isi backup tidak valid.');
-    for (const r of data.reminders) { validateReminder(r); if (typeof r.id !== 'string' || !Number.isFinite(Date.parse(r.anchor)) || typeof r.enabled !== 'boolean' || typeof r.completed !== 'boolean' || (r.nextNotify !== null && !Number.isFinite(Date.parse(r.nextNotify)))) throw new Error('Reminder backup tidak valid.'); }
+    for (const r of data.reminders) { validateReminder(r); if (typeof r.id !== 'string' || (r.mode==='note' ? r.anchor!=='' : !Number.isFinite(Date.parse(r.anchor))) || typeof r.enabled !== 'boolean' || typeof r.completed !== 'boolean' || (r.nextNotify !== null && !Number.isFinite(Date.parse(r.nextNotify)))) throw new Error('Reminder backup tidak valid.'); }
     for (const c of data.credentials) { for (const field of ['id','title','username','url','password','notes','category']) if (typeof c[field] !== 'string' || c[field].length > 10000) throw new Error('Credential backup tidak valid.'); }
     for (const h of data.history) if (typeof h.id !== 'string' || typeof h.title !== 'string' || !Number.isFinite(Date.parse(h.completedAt))) throw new Error('Riwayat backup tidak valid.');
     for(const r of data.runbooks){this.validateRunbook(r);if(typeof r.id!=='string'||!Number.isFinite(Date.parse(r.createdAt))||!Number.isFinite(Date.parse(r.updatedAt)))throw new Error('Runbook backup tidak valid.');}
