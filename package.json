@@ -1,6 +1,6 @@
 {
   "name": "anchor-local",
-  "version": "1.7.1",
+  "version": "1.7.2",
   "description": "Personal encrypted vault and local reminders",
   "author": "Personal",
   "private": true,

@@ -9,6 +9,33 @@ import { deliverDue } from '../electron/scheduler';
 import { derive, salt } from '../electron/crypto';
 import { selectTasks, taskWorkbook } from '../electron/task-export';
 import { taskView } from '../electron/task-view';
+import { duplicateTask } from '../src/task-draft';
+
+test('duplicate can be edited and saved independently of a completed synced task',async()=>{
+  const s=await store();
+  const original=create(s,{estimatedHours:2,actualHours:1.5});
+  const source={...original,completed:true,enabled:false,syncToSheets:true,sheetTarget:{spreadsheetId:'sheet',sheetId:0,pic:'PIC',timeZone:'Asia/Jakarta'}};
+  const draft=duplicateTask(source);
+  assert.equal(draft.actualHours,null);assert.equal(draft.estimatedHours,2);
+  assert.equal(draft.syncToSheets,false);assert.equal(draft.completed,false);assert.equal(draft.enabled,true);
+  for(const key of ['id','createdAt','sheetTarget','completedAt','lastNotified','nextNotify','anchor'])assert.equal(key in draft,false);
+  draft.title='Copy edited';draft.notes='New steps';
+  s.saveReminder(draft);
+  const rows=s.reminders(),copy=rows.find(r=>r.id!==original.id)!;
+  assert.equal(rows.length,2);assert.equal(copy.title,'Copy edited');assert.equal(copy.notes,'New steps');
+  assert.ok(copy.createdAt);assert.equal(copy.completed,false);assert.equal(copy.actualHours,null);
+  assert.deepEqual(rows.find(r=>r.id===original.id),original);
+});
+
+test('duplicate preserves ongoing cadence and normalizes note and legacy deadline tasks',()=>{
+  const ongoing=duplicateTask(task({mode:'ongoing',recurrence:'custom',every:30,unit:'seconds'}));
+  assert.equal(ongoing.recurrence,'custom');assert.equal(ongoing.every,30);assert.equal(ongoing.unit,'seconds');
+  const deadline=duplicateTask(task({recurrence:'monthly'}));
+  assert.equal(deadline.recurrence,'once');
+  const note=duplicateTask(task({mode:'note'}));
+  assert.equal(note.due,'');assert.equal(note.windows,false);assert.equal(note.repeatMinutes,0);
+  validateReminder(note);
+});
 
 test('created range uses inclusive local calendar days, open bounds and export ordering',()=>{
   const at=(d:number,h=0)=>new Date(2026,9,d,h,59,59,999).toISOString();
