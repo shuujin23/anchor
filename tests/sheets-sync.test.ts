@@ -60,23 +60,40 @@ test('Google date conversion uses sheet timezone and credential input cannot red
  assert.equal(parseCredential(credential).client_email,'anchor@test.iam.gserviceaccount.com');assert.throws(()=>parseCredential('{}'));
 });
 test('Google API atomically inserts metadata with row, retries by identity, uses RAW updates and protects manual headers',async()=>{
- const bodies:any[]=[];let exists=false,wrongHeader=false;
+ const bodies:any[]=[];let exists=false,wrongHeader=false;let customHeader:string[]|undefined;
  const http=(async(url:any,init:any)=>{
   const u=String(url),body=init?.body;let result:any={};
   if(u.includes('oauth2'))result={access_token:'TEST_TOKEN'};
   else if(u.includes('?fields='))result={properties:{title:'Work',timeZone:'Asia/Jakarta'},sheets:[{properties:{sheetId:0,title:'Ujun',sheetType:'GRID'}}]};
-  else if(u.includes('/values/'))result={values:[[wrongHeader?'Oops':'No.','Task','Detail Task','Tanggal Mengerjakan','Manhours','Catatan']]};
+  else if(u.includes('/values/'))result={values:[customHeader??[wrongHeader?'Oops':'No.','Task','Detail Task','Tanggal Mengerjakan','Manhours','Catatan']]};
   else if(u.endsWith('/developerMetadata:search'))result={matchedDeveloperMetadata:exists?[{developerMetadata:{metadataId:10,location:{dimensionRange:{sheetId:0,dimension:'ROWS',startIndex:3,endIndex:4}}}}]:[]};
   else{bodies.push(JSON.parse(body));exists=true;}
   return new Response(JSON.stringify(result),{status:200,headers:{'content-type':'application/json'}});
  }) as typeof fetch;
  const client=new GoogleSheets(parseCredential(credential),http),row={taskId:'unique-task',title:'=DANGEROUS()',date:46000,hours:null,notes:'+formula'};
- await client.upsert(target,row,false,()=>true);assert.equal(bodies[0].requests.length,3);assert.equal(bodies[0].requests[1].updateCells.rows[0].values[1].userEnteredValue.stringValue,row.title);assert.equal(bodies[0].requests[2].createDeveloperMetadata.developerMetadata.metadataValue,row.taskId);
- const inserted=bodies[0].requests[1].updateCells.rows[0].values;
+ await client.upsert(target,row,false,()=>true);assert.equal(bodies[0].requests.length,7);assert.equal(bodies[0].requests[2].updateCells.rows[0].values[0].userEnteredValue.stringValue,row.title);assert.equal(bodies[0].requests[6].createDeveloperMetadata.developerMetadata.metadataValue,row.taskId);
+ const inserted=bodies[0].requests.slice(1,6).map((r:any)=>r.updateCells.rows[0].values[0]);
  assert.equal(inserted.length,5);assert.equal(inserted[2].userEnteredValue.stringValue,row.notes);assert.equal(inserted[3].userEnteredValue.numberValue,row.date);
  await client.upsert(target,{...row,hours:0},false,()=>true);assert.equal(bodies[1].valueInputOption,'RAW');assert.equal(bodies[1].data[0].values[0][4],0);assert.equal(bodies[1].data[0].dataFilter.developerMetadataLookup.metadataId,10);
  assert.deepEqual(bodies[1].data[0].values[0],[null,row.title,row.notes,row.date,0]); // F is absent, so manual Catatan is untouched.
  wrongHeader=true;await assert.rejects(client.upsert(target,row,true,()=>true));assert.equal(bodies.length,2);
  wrongHeader=false;exists=false;await assert.rejects(client.upsert(target,row,true,()=>true));assert.equal(bodies.length,2);
  await client.upsert(target,row,false,()=>false);assert.equal(bodies.length,2);
+ for(const layout of [
+  ['No.','Task','Detail Task','Kategori Task','Tanggal Mengerjakan','Manhours','Status','Catatan'],
+  ['ID.','No.','Task','Detail Task','Kategori Task','Tanggal Mengerjakan','Manhours','Status','Catatan'],
+  ['Catatan','Manhours','Status','Task','Tanggal Mengerjakan','ID.','Detail Task','No.']
+ ]){
+  customHeader=layout;exists=false;
+  await client.upsert(target,row,false,()=>true);
+  const insert=bodies.at(-1).requests.slice(1,6);
+  assert.deepEqual(insert.map((r:any)=>r.updateCells.start.columnIndex),['No.','Task','Detail Task','Tanggal Mengerjakan','Manhours'].map(h=>layout.indexOf(h)));
+  await client.upsert(target,{...row,hours:2},true,()=>true);
+  const cells=bodies.at(-1).data[0].values[0];
+  for(const [name,value] of [['Task',row.title],['Detail Task',row.notes],['Tanggal Mengerjakan',row.date],['Manhours',2]] as const)assert.equal(cells[layout.indexOf(name)],value);
+  for(const name of ['No.','Kategori Task','Status','Catatan','ID.']){const i=layout.indexOf(name);if(i>=0)assert.ok(cells[i]==null);}
+ }
+ const count=bodies.length;
+ customHeader=['No.','Task','Task','Detail Task','Tanggal Mengerjakan','Manhours'];
+ await assert.rejects(client.upsert(target,row,true,()=>true),/tepat satu kali/);assert.equal(bodies.length,count);
 });
